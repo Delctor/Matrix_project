@@ -33,7 +33,7 @@ namespace matrix
 			std::is_same<T, int64_t>::value ||
 			std::is_same<T, bool>::value
 			,
-			"The data type must be double or int");
+			"");
 	};
 	
 	template <typename T, bool tranposed = false, bool contiguous = true, bool call_destructor = true>
@@ -46,7 +46,7 @@ namespace matrix
 			std::is_same<T, int64_t>::value ||
 			std::is_same<T, bool>::value
 			,
-			"The data type only can be double, float, int, uint64_t or int64_t");
+			"");
 	};
 
 	//-----------------------------------
