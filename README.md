@@ -1,1 +1,1 @@
-# Matrix_project
+# Algebra_project
