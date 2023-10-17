@@ -2,7 +2,7 @@
 Ok now i will code a libray similar to numpy in c++ using SIMD (Single Instruction, Multiple Data) 
 I want to point out that i am not a engineer and even less a computer engineer so maybe this is not the most efficient way to do this but 
 the reason why i am doing this is beacuse i want to learn. 
-This libreary will have matrices / transposed matrices and vectors of type double, float, int, uint64_t, int64_t and bool, i will explain firts the type bool.
+This library will have matrices / transposed matrices and vectors of type double, float, int, uint64_t, int64_t and bool, i will explain firts the type bool.
 
 The point of the vector or matrix boolean are mainly three: Logical operations, 
 Replace elements based on conditions (somthing like numpy.where) and count the number of elements that are true, 
@@ -23,6 +23,6 @@ i have not finish this libray i still need to implement Dot product / matrix mul
 a function to compute the determinant, other types of vectors and matrices and I need to check that everything works well, 
 I had already implemented most of this but due to the restructuring I have done I must implement it from scratch.
 Maybe when someone sees this I will have already implemented what is missing.
-My ultimate goal is finish this and then start to code the optimization libreary in c++.
+My ultimate goal is finish this and then start to code the optimization library in c++.
 I am thinking of adding multiprocessing so that different types of optimization algorithms can be used at the same time 
 and they communicate by sharing memory or sharing a database like MySql, it would be interesting to see a tpe and a genetic algorithm together.
