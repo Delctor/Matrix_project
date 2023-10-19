@@ -3,7 +3,6 @@
 #include <iostream>
 #include <cmath>
 #include <immintrin.h>
-#include <ppl.h>
 
 #define uint32_to_float(v) __m256i v2 = _mm256_srli_epi32(v, 1); \
     __m256i v1 = _mm256_sub_epi32(v, v2); \
@@ -2497,6 +2496,11 @@ namespace matrix
 			return exp / exp.sum();
 		}
 
+		inline void sort() 
+		{
+			//std::stable_sort(this->_data, this->_data + this->_size, std::greater<double>());
+		}
+
 		template <typename T>
 		inline vector<T> cast()
 		{
@@ -4965,7 +4969,8 @@ namespace matrix
 
 		inline vector<float> softmax()
 		{
-			vector<float> exp = this->operator-(this->max()).exp();
+			vector<float> exp = ((*this) - this->max()).exp();
+			
 			return exp / exp.sum();
 		}
 
@@ -7935,41 +7940,18 @@ namespace matrix
 
 			uint8_t* data1 = this->_data;
 
-			int masks[8];
-
-			__m256i mask1 = _mm256_set1_epi32(0x55555555);
-			__m256i mask2 = _mm256_set1_epi32(0x33333333);
-			__m256i mask3 = _mm256_set1_epi32(0x0F0F0F0F);
-			__m256i mask4 = _mm256_set1_epi32(0x00FF00FF);
-			__m256i mask5 = _mm256_set1_epi32(0x0000FFFF);
-
 			uint64_t sum = 0;
 
 			for (size_t i = 0; i < finalPos256; i += 256)
 			{
-				masks[0] = _mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i]));
-				masks[1] = _mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 32]));
-				masks[2] = _mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 64]));
-				masks[3] = _mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 96]));
-				masks[4] = _mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 128]));
-				masks[5] = _mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 160]));
-				masks[6] = _mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 192]));
-				masks[7] = _mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 224]));
-
-				__m256i masks_reg = _mm256_loadu_epi32(masks);
-
-				masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask1), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 1), mask1));
-				masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask2), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 2), mask2));
-				masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask3), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 4), mask3));
-				masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask4), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 8), mask4));
-				masks_reg = _mm256_add_epi32(_mm256_srli_epi32(masks_reg, 16), _mm256_and_si256(masks_reg, mask5));
-
-				__m256i a_hi = _mm256_permute2x128_si256(masks_reg, masks_reg, 1);
-				masks_reg = _mm256_hadd_epi32(masks_reg, a_hi);
-				masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-				masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-
-				sum = _mm_cvtsi128_si32(_mm256_castsi256_si128(masks_reg));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 32])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 64])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 96])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 128])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 160])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 192])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 224])));
 			}
 			for (size_t i = finalPos256; i < size; i++)
 			{
@@ -27114,14 +27096,6 @@ namespace matrix
 
 			size_t count = 0;
 
-			int masks[8];
-
-			__m256i mask1 = _mm256_set1_epi32(0x55555555);
-			__m256i mask2 = _mm256_set1_epi32(0x33333333);
-			__m256i mask3 = _mm256_set1_epi32(0x0F0F0F0F);
-			__m256i mask4 = _mm256_set1_epi32(0x00FF00FF);
-			__m256i mask5 = _mm256_set1_epi32(0x0000FFFF);
-
 			if constexpr (thisContiguous)
 			{
 				size_t size = this->_size;
@@ -27130,31 +27104,14 @@ namespace matrix
 
 				for (size_t i = 0; i < finalPosSize256; i += 256)
 				{
-					masks[0] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i]));
-					masks[1] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i + 32]));
-					masks[2] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i + 64]));
-					masks[3] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i + 96]));
-					masks[4] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i + 128]));
-					masks[5] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i + 160]));
-					masks[6] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i + 192]));
-					masks[7] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i + 224]));
-
-					__m256i masks_reg = _mm256_loadu_epi32(masks);
-
-					//Get the number of bits that are 1
-
-					masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask1), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 1), mask1));
-					masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask2), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 2), mask2));
-					masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask3), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 4), mask3));
-					masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask4), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 8), mask4));
-					masks_reg = _mm256_add_epi32(_mm256_srli_epi32(masks_reg, 16), _mm256_and_si256(masks_reg, mask5));
-
-					__m256i a_hi = _mm256_permute2x128_si256(masks_reg, masks_reg, 1);
-					masks_reg = _mm256_hadd_epi32(masks_reg, a_hi);
-					masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-					masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-
-					count = _mm_cvtsi128_si32(_mm256_castsi256_si128(masks_reg));
+					count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i])));
+					count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 32])));
+					count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 64])));
+					count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 96])));
+					count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 128])));
+					count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 160])));
+					count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 192])));
+					count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 224])));
 				}
 				for (size_t i = finalPosSize256; i < size; i++)
 				{
@@ -27171,31 +27128,14 @@ namespace matrix
 				{
 					for (size_t i = 0; i < finalPosActualRows256; i += 256)
 					{
-						masks[0] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i]));
-						masks[1] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 32]));
-						masks[2] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 64]));
-						masks[3] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 96]));
-						masks[4] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 128]));
-						masks[5] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 160]));
-						masks[6] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 192]));
-						masks[7] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 224]));
-
-						__m256i masks_reg = _mm256_loadu_epi32(masks);
-
-						//Get the number of bits that are 1
-
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask1), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 1), mask1));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask2), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 2), mask2));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask3), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 4), mask3));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask4), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 8), mask4));
-						masks_reg = _mm256_add_epi32(_mm256_srli_epi32(masks_reg, 16), _mm256_and_si256(masks_reg, mask5));
-
-						__m256i a_hi = _mm256_permute2x128_si256(masks_reg, masks_reg, 1);
-						masks_reg = _mm256_hadd_epi32(masks_reg, a_hi);
-						masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-						masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-
-						count = _mm_cvtsi128_si32(_mm256_castsi256_si128(masks_reg));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 32])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 64])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 96])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 128])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 160])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 192])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 224])));
 					}
 					for (size_t i = finalPosActualRows256; i < rows; i++)
 					{
@@ -27215,31 +27155,14 @@ namespace matrix
 				{
 					for (size_t j = 0; j < finalPosActualCols256; j += 256)
 					{
-						masks[0] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j]));
-						masks[1] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 32]));
-						masks[2] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 64]));
-						masks[3] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 96]));
-						masks[4] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 128]));
-						masks[5] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 160]));
-						masks[6] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 192]));
-						masks[7] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 224]));
-
-						__m256i masks_reg = _mm256_loadu_epi32(masks);
-
-						//Get the number of bits that are 1
-
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask1), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 1), mask1));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask2), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 2), mask2));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask3), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 4), mask3));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask4), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 8), mask4));
-						masks_reg = _mm256_add_epi32(_mm256_srli_epi32(masks_reg, 16), _mm256_and_si256(masks_reg, mask5));
-
-						__m256i a_hi = _mm256_permute2x128_si256(masks_reg, masks_reg, 1);
-						masks_reg = _mm256_hadd_epi32(masks_reg, a_hi);
-						masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-						masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-
-						count = _mm_cvtsi128_si32(_mm256_castsi256_si128(masks_reg));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 32])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 64])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 96])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 128])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 160])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 192])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 224])));
 					}
 					for (size_t j = finalPosActualCols256; j < cols; j++)
 					{
@@ -27262,14 +27185,6 @@ namespace matrix
 
 			if constexpr (thisTransposed)
 			{
-				int masks[8];
-
-				__m256i mask1 = _mm256_set1_epi32(0x55555555);
-				__m256i mask2 = _mm256_set1_epi32(0x33333333);
-				__m256i mask3 = _mm256_set1_epi32(0x0F0F0F0F);
-				__m256i mask4 = _mm256_set1_epi32(0x00FF00FF);
-				__m256i mask5 = _mm256_set1_epi32(0x0000FFFF);
-
 				size_t matrix1ActualRows = this->actualRows;
 
 				size_t extra_rows = matrix1ActualRows - rows;
@@ -27281,31 +27196,14 @@ namespace matrix
 					size_t count = 0;
 					for (size_t i = 0; i < finalPosActualRows256; i += 256)
 					{
-						masks[0] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i]));
-						masks[1] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 32]));
-						masks[2] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 64]));
-						masks[3] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 96]));
-						masks[4] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 128]));
-						masks[5] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 160]));
-						masks[6] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 192]));
-						masks[7] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 224]));
-
-						__m256i masks_reg = _mm256_loadu_epi32(masks);
-
-						//Get the number of bits that are 1
-
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask1), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 1), mask1));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask2), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 2), mask2));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask3), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 4), mask3));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask4), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 8), mask4));
-						masks_reg = _mm256_add_epi32(_mm256_srli_epi32(masks_reg, 16), _mm256_and_si256(masks_reg, mask5));
-
-						__m256i a_hi = _mm256_permute2x128_si256(masks_reg, masks_reg, 1);
-						masks_reg = _mm256_hadd_epi32(masks_reg, a_hi);
-						masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-						masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-
-						count = _mm_cvtsi128_si32(_mm256_castsi256_si128(masks_reg));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 32])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 64])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 96])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 128])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 160])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 192])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 224])));
 					}
 					for (size_t i = finalPosActualRows256; i < rows; i++)
 					{
@@ -27358,14 +27256,7 @@ namespace matrix
 			}
 			else
 			{
-				int masks[8];
-
-				__m256i mask1 = _mm256_set1_epi32(0x55555555);
-				__m256i mask2 = _mm256_set1_epi32(0x33333333);
-				__m256i mask3 = _mm256_set1_epi32(0x0F0F0F0F);
-				__m256i mask4 = _mm256_set1_epi32(0x00FF00FF);
-				__m256i mask5 = _mm256_set1_epi32(0x0000FFFF);
-
+				
 				size_t matrix1ActualCols = this->actualCols;
 
 				size_t extra_cols = matrix1ActualCols - cols;
@@ -27377,31 +27268,14 @@ namespace matrix
 					size_t count = 0;
 					for (size_t j = 0; j < finalPosActualCols256; j += 256)
 					{
-						masks[0] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j]));
-						masks[1] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 32]));
-						masks[2] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 64]));
-						masks[3] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 96]));
-						masks[4] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 128]));
-						masks[5] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 160]));
-						masks[6] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 192]));
-						masks[7] = _mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 224]));
-
-						__m256i masks_reg = _mm256_loadu_epi32(masks);
-
-						//Get the number of bits that are 1
-
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask1), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 1), mask1));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask2), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 2), mask2));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask3), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 4), mask3));
-						masks_reg = _mm256_add_epi32(_mm256_and_si256(masks_reg, mask4), _mm256_and_si256(_mm256_srli_epi32(masks_reg, 8), mask4));
-						masks_reg = _mm256_add_epi32(_mm256_srli_epi32(masks_reg, 16), _mm256_and_si256(masks_reg, mask5));
-
-						__m256i a_hi = _mm256_permute2x128_si256(masks_reg, masks_reg, 1);
-						masks_reg = _mm256_hadd_epi32(masks_reg, a_hi);
-						masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-						masks_reg = _mm256_hadd_epi32(masks_reg, masks_reg);
-
-						count = _mm_cvtsi128_si32(_mm256_castsi256_si128(masks_reg));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 32])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 64])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 96])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 128])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 160])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 192])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 224])));
 					}
 					for (size_t j = finalPosActualCols256; j < cols; j++)
 					{
