@@ -2346,13 +2346,17 @@ namespace matrix
 
 			__m256d num = _mm256_set1_pd(0.01);
 
+			__m256d zero = _mm256_setzero_pd();
+
 			for (size_t i = 0; i < finalPos; i += 4)
 			{
-				_mm256_store_pd(&dataResult[i], _mm256_max_pd(num, _mm256_load_pd(&data1[i])));
+				__m256d a = _mm256_load_pd(&data1[i]);
+
+				_mm256_store_pd(&dataResult[i], _mm256_blendv_pd(_mm256_mul_pd(a, num), a, _mm256_cmp_pd(a, zero, _CMP_GT_OQ)));
 			}
 			for (size_t i = finalPos; i < size; i++)
 			{
-				dataResult[i] = std::max(0.01, data1[i]);
+				dataResult[i] = data1[i] > 0.0 ? data1[i] : 0.01 * data1[i];
 			}
 			return result;
 		}
@@ -2365,15 +2369,19 @@ namespace matrix
 
 			double* data1 = this->_data;
 
+			__m256d num = _mm256_set1_pd(0.01);
+
 			__m256d zero = _mm256_setzero_pd();
 
 			for (size_t i = 0; i < finalPos; i += 4)
 			{
-				_mm256_store_pd(&data1[i], _mm256_max_pd(zero, _mm256_load_pd(&data1[i])));
+				__m256d a = _mm256_load_pd(&data1[i]);
+
+				_mm256_store_pd(&data1[i], _mm256_blendv_pd(_mm256_mul_pd(a, num), a, _mm256_cmp_pd(a, zero, _CMP_GT_OQ)));
 			}
 			for (size_t i = finalPos; i < size; i++)
 			{
-				data1[i] = std::max(0.0, data1[i]);
+				data1[i] = data1[i] > 0.0 ? data1[i] : 0.01 * data1[i];
 			}
 		}
 
@@ -4824,13 +4832,17 @@ namespace matrix
 
 			__m256 num = _mm256_set1_ps(0.01f);
 
-			for (size_t i = 0; i < finalPos; i += 4)
+			__m256 zero = _mm256_setzero_ps();
+
+			for (size_t i = 0; i < finalPos; i += 8)
 			{
-				_mm256_store_ps(&dataResult[i], _mm256_max_ps(num, _mm256_load_ps(&data1[i])));
+				__m256 a = _mm256_load_ps(&data1[i]);
+
+				_mm256_store_ps(&dataResult[i], _mm256_blendv_ps(_mm256_mul_ps(a, num), a, _mm256_cmp_ps(a, zero, _CMP_GT_OQ)));
 			}
 			for (size_t i = finalPos; i < size; i++)
 			{
-				dataResult[i] = std::max(0.01f, data1[i]);
+				dataResult[i] = data1[i] > 0.0f ? data1[i] : 0.01f * data1[i];
 			}
 			return result;
 		}
@@ -4843,15 +4855,19 @@ namespace matrix
 
 			float* data1 = this->_data;
 
+			__m256 num = _mm256_set1_ps(0.01f);
+
 			__m256 zero = _mm256_setzero_ps();
 
-			for (size_t i = 0; i < finalPos; i += 4)
+			for (size_t i = 0; i < finalPos; i += 8)
 			{
-				_mm256_store_ps(&data1[i], _mm256_max_ps(zero, _mm256_load_ps(&data1[i])));
+				__m256 a = _mm256_load_ps(&data1[i]);
+
+				_mm256_store_ps(&data1[i], _mm256_blendv_ps(_mm256_mul_ps(a, num), a, _mm256_cmp_ps(a, zero, _CMP_GT_OQ)));
 			}
 			for (size_t i = finalPos; i < size; i++)
 			{
-				data1[i] = std::max(0.0f, data1[i]);
+				data1[i] = data1[i] > 0.0f ? data1[i] : 0.01f * data1[i];
 			}
 		}
 
