@@ -46,7 +46,7 @@
 
 namespace matrix
 {
-	template <typename T>
+	template <typename T, bool otherCallDestructor = true>
 	class vector 
 	{
 		static_assert(std::is_same<T, double>::value || 
@@ -54,7 +54,7 @@ namespace matrix
 			std::is_same<T, int>::value || 
 			std::is_same<T, uint64_t>::value || 
 			std::is_same<T, int64_t>::value ||
-			std::is_same<T, bool>::value
+			std::is_same<T, uint8_t>::value
 			,
 			"The data type only can be double, float, int, uint64_t or int64_t or uint8_t");
 	};
@@ -67,7 +67,7 @@ namespace matrix
 			std::is_same<T, int>::value ||
 			std::is_same<T, uint64_t>::value ||
 			std::is_same<T, int64_t>::value ||
-			std::is_same<T, bool>::value
+			std::is_same<T, uint8_t>::value
 			,
 			"The data type only can be double or float");
 	};
@@ -86,33 +86,1797 @@ namespace matrix
 		__seeds__ = _mm256_loadu_epi64(seeds);
 	}
 
-	template <>
-	class vector<double>
+	template <bool thisCallDestructor>
+	class vector<uint8_t, thisCallDestructor>
+	{
+	public:
+		inline vector(size_t size) : _data(new uint8_t[size]), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
+
+		inline vector(uint8_t* data, size_t size) : _data(data), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
+
+		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
+
+		// Friend classes
+
+		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		friend class matrix;
+
+		template <typename T, bool otherCallDestructor>
+		friend class vector;
+
+		// Friend functions
+
+		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
+		friend inline vector<double> where(vector<uint8_t, callDestructor1>&, vector<double, callDestructor2>&, vector<double, callDestructor3>&);
+
+		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
+		friend inline vector<float> where(vector<uint8_t, callDestructor1>&, vector<float, callDestructor2>&, vector<float, callDestructor3>&);
+
+		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
+		friend inline vector<uint64_t> where(vector<uint8_t, callDestructor1>&, vector<uint64_t, callDestructor2>&, vector<uint64_t, callDestructor3>&);
+
+		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
+		friend inline vector<int> where(vector<uint8_t, callDestructor1>&, vector<int, callDestructor2>&, vector<int, callDestructor3>&);
+
+		template<bool otherCallDestructor>
+		friend std::ostream& operator<<(std::ostream& os, const vector<uint8_t, otherCallDestructor>& vector)
+		{
+			for (size_t i = 0; i < vector._size; i++)
+			{
+				std::cout << (vector._data[i] ? 1 : 0) << std::endl;
+			}
+			return os;
+		}
+
+		inline uint8_t* data() { return this->_data; }
+
+		inline size_t size() { return this->_size; }
+
+		inline uint8_t& operator[](size_t index)
+		{
+			uint8_t* data = this->_data;
+			return data[index];
+		}
+
+		inline const uint8_t& operator[](size_t index) const
+		{
+			uint8_t* data = this->_data;
+			return data[index];
+		}
+
+		// &&
+
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator&&(vector<uint8_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint8_t* data1 = this->_data;
+			uint8_t* data2 = other._data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 32)
+			{
+				__m256i a = _mm256_loadu_epi8(&data1[i]);
+				__m256i b = _mm256_loadu_epi8(&data2[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_and_si256(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] & data2[i];
+			}
+			return result;
+		}
+
+		inline vector<uint8_t> operator&&(uint8_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint8_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi8(num);
+
+			for (size_t i = 0; i < finalPos; i += 32)
+			{
+				__m256i a = _mm256_loadu_epi8(&data1[i]);
+
+				_mm256_storeu_epi8(&dataResult[i], _mm256_and_si256(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] & num;
+			}
+			return result;
+		}
+
+		// ||
+
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator||(vector<uint8_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint8_t* data1 = this->_data;
+			uint8_t* data2 = other._data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 32)
+			{
+				__m256i a = _mm256_loadu_epi8(&data1[i]);
+				__m256i b = _mm256_loadu_epi8(&data2[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_or_si256(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] | data2[i];
+			}
+			return result;
+		}
+
+		inline vector<uint8_t> operator||(uint8_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint8_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi8(num);
+
+			for (size_t i = 0; i < finalPos; i += 32)
+			{
+				__m256i a = _mm256_loadu_epi8(&data1[i]);
+
+				_mm256_storeu_epi8(&dataResult[i], _mm256_or_si256(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] | num;
+			}
+			return result;
+		}
+
+		// !
+
+		inline vector<uint8_t> operator!()
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint8_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i zero = _mm256_setzero_si256();
+
+			for (size_t i = 0; i < finalPos; i += 32)
+			{
+				__m256i a = _mm256_loadu_epi8(&data1[i]);
+
+				_mm256_storeu_epi8(&dataResult[i], _mm256_and_si256(a, zero));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] & 0;
+			}
+			return result;
+		}
+
+		inline void self_not()
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint8_t* data1 = this->_data;
+
+			__m256i zero = _mm256_setzero_si256();
+
+			for (size_t i = 0; i < finalPos; i += 32)
+			{
+				__m256i a = _mm256_loadu_epi8(&data1[i]);
+
+				_mm256_storeu_epi8(&data1[i], _mm256_and_si256(a, zero));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] = data1[i] & 0;
+			}
+		}
+
+		// Count
+
+		inline uint64_t count()
+		{
+			size_t size = this->_size;
+
+			size_t finalPos256 = this->finalPos256;
+
+			uint8_t* data1 = this->_data;
+
+			uint64_t sum = 0;
+
+			for (size_t i = 0; i < finalPos256; i += 256)
+			{
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 32])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 64])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 96])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 128])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 160])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 192])));
+				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 224])));
+			}
+			for (size_t i = finalPos256; i < size; i++)
+			{
+				if (data1[i]) sum++;
+			}
+		}
+
+		// Cast
+
+		template<typename T>
+		inline vector<T> cast()
+		{
+			size_t size = this->_size;
+
+			uint8_t* data1 = this->_data;
+
+			vector<T> result(size);
+
+			T* dataResult = result._data;
+
+			if constexpr (std::is_same<T, double>)
+			{
+				size_t finalPos = (this->_size / 4) * 4;
+				__m256d zero = _mm256_setzero_pd();
+				__m256d one = _mm256_set1_pd(1.0);
+
+				for (size_t i = 0; i < finalPos; i += 4)
+				{
+					_mm256_store_pd(&dataResult[i], _mm256_blend_pd(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
+				}
+				for (size_t i = finalPos; i < size; i++)
+				{
+					dataResult[i] = data1[i] ? 1.0 : 0.0;
+				}
+			}
+			else if constexpr (std::is_same<T, float>)
+			{
+				size_t finalPos = (this->_size / 8) * 8;
+				__m256 zero = _mm256_setzero_ps();
+				__m256 one = _mm256_set1_ps(1.0f);
+
+				for (size_t i = 0; i < finalPos; i += 8)
+				{
+					_mm256_store_ps(&dataResult[i], _mm256_blend_ps(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
+				}
+				for (size_t i = finalPos; i < size; i++)
+				{
+					dataResult[i] = data1[i] ? 1.0f : 0.0f;
+				}
+			}
+			else if constexpr (std::is_same<T, uint64_t>)
+			{
+				size_t finalPos = (this->_size / 4) * 4;
+				__m256i zero = _mm256_setzero_si256();
+				__m256i one = _mm256_set1_epi64x(1);
+
+				for (size_t i = 0; i < finalPos; i += 4)
+				{
+					_mm256_storeu_epi64(&dataResult[i], _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(one), _mm256_castsi256_pd(zero), _mm_movemask_epi8(_mm_loadu_epi8(&data1[i])))));
+				}
+				for (size_t i = finalPos; i < size; i++)
+				{
+					dataResult[i] = data1[i] ? 1 : 0;
+				}
+			}
+			else if constexpr (std::is_same<T, int>)
+			{
+				size_t finalPos = (this->_size / 8) * 8;
+				__m256i zero = _mm256_setzero_si256();
+				__m256i one = _mm256_set1_epi32(1);
+
+				for (size_t i = 0; i < finalPos; i += 8)
+				{
+					_mm256_storeu_epi32(&dataResult[i], _mm256_blend_epi32(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
+				}
+				for (size_t i = finalPos; i < size; i++)
+				{
+					dataResult[i] = data1[i] ? 1 : 0;
+				}
+			}
+		}
+
+	private:
+		uint8_t* _data;
+		size_t _size;
+		size_t finalPos, finalPos256;
+	};
+
+	template <bool thisCallDestructor>
+	class vector<uint64_t, thisCallDestructor>
+	{
+	public:
+		inline vector(size_t size) : _data(new uint64_t[size]), _size(size), finalPos((size / 4) * 4) {}
+
+		inline vector(uint64_t* data, size_t size) : _data(data), _size(size), finalPos((size / 4) * 4) {}
+
+		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
+
+		// Friend classes
+
+		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		friend class matrix;
+
+		template <typename T, bool otherCallDestructor>
+		friend class vector;
+
+		// Friend functions
+
+		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
+		friend inline vector<uint64_t> where(vector<uint8_t, callDestructor1>&, vector<uint64_t, callDestructor2>&, vector<uint64_t, callDestructor3>&);
+
+		template<bool otherCallDestructor>
+		friend std::ostream& operator<<(std::ostream& os, const vector<uint64_t, otherCallDestructor>& vector)
+		{
+			for (size_t i = 0; i < vector._size; i++)
+			{
+				std::cout << vector._data[i] << std::endl;
+			}
+			return os;
+		}
+
+		inline uint64_t* data() { return this->_data; }
+
+		inline size_t size() { return this->_size; }
+
+		inline uint64_t& operator[](size_t index)
+		{
+			uint64_t* data = this->_data;
+			return data[index];
+		}
+
+		inline const uint64_t& operator[](size_t index) const
+		{
+			uint64_t* data = this->_data;
+			return data[index];
+		}
+
+		// Set Constant
+
+		inline void set_const(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			for (size_t i = 0; i < size; i++)
+			{
+				data1[i] = num;
+			}
+		}
+
+		// +
+
+		template <bool otherCallDestructor>
+		inline vector<uint64_t> operator+(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_add_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] + data2[i];
+			}
+			return result;
+		}
+
+		inline vector<uint64_t> operator+(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_add_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] + num;
+			}
+			return result;
+		}
+
+		template <bool otherCallDestructor>
+		inline void operator+=(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				_mm256_storeu_epi64(&data1[i], _mm256_add_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] += data2[i];
+			}
+		}
+
+		inline void operator+=(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				_mm256_storeu_epi64(&data1[i], _mm256_add_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] += num;
+			}
+		}
+
+		// -
+
+		template <bool otherCallDestructor>
+		inline vector<uint64_t> operator-(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_sub_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] - data2[i];
+			}
+			return result;
+		}
+
+		inline vector<uint64_t> operator-(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_sub_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] - num;
+			}
+			return result;
+		}
+
+		template <bool otherCallDestructor>
+		inline void operator-=(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				_mm256_storeu_epi64(&data1[i], _mm256_sub_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] -= data2[i];
+			}
+		}
+
+		inline void operator-=(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				_mm256_storeu_epi64(&data1[i], _mm256_sub_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] -= num;
+			}
+		}
+
+		// *
+
+		template <bool otherCallDestructor>
+		inline vector<uint64_t> operator*(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_mul_epu32(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] * data2[i];
+			}
+			return result;
+		}
+
+		inline vector<uint64_t> operator*(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_mul_epu32(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] * num;
+			}
+			return result;
+		}
+
+		template <bool otherCallDestructor>
+		inline void operator*=(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				_mm256_storeu_epi64(&data1[i], _mm256_mul_epu32(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] *= data2[i];
+			}
+		}
+
+		inline void operator*=(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				_mm256_storeu_epi64(&data1[i], _mm256_mul_epu32(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] *= num;
+			}
+		}
+
+		// /
+
+		template <bool otherCallDestructor>
+		inline vector<uint64_t> operator/(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_div_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] / data2[i];
+			}
+			return result;
+		}
+
+		inline vector<uint64_t> operator/(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				_mm256_storeu_epi64(&dataResult[i], _mm256_div_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] / num;
+			}
+			return result;
+		}
+
+		template <bool otherCallDestructor>
+		inline void operator/=(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				_mm256_storeu_epi64(&data1[i], _mm256_div_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] /= data2[i];
+			}
+		}
+
+		inline void operator/=(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				_mm256_storeu_epi64(&data1[i], _mm256_div_epi64(a, b));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				data1[i] /= num;
+			}
+		}
+
+		// ==
+
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator==(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				__m256i mask = _mm256_cmpeq_epi64(a, b);
+
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] == data2[i] ? True : False;
+			}
+			return result;
+		}
+
+		inline vector<uint8_t> operator==(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				__m256i mask = _mm256_cmpeq_epi64(a, b);
+
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] == num ? True : False;
+			}
+			return result;
+		}
+
+		// !=
+
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator!=(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i minus_ones = _mm256_set1_epi64x(-1);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				__m256i mask = _mm256_andnot_si256(_mm256_cmpeq_epi64(a, b), minus_ones);
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] != data2[i] ? True : False;
+			}
+			return result;
+		}
+
+		inline vector<uint8_t> operator!=(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			__m256i minus_ones = _mm256_set1_epi64x(-1);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				__m256i mask = _mm256_andnot_si256((_mm256_cmpeq_epi64(a, b)), minus_ones);
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] != num ? True : False;
+			}
+			return result;
+		}
+
+		// >
+
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator>(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				__m256i mask = _mm256_cmpgt_epi64(a, b);
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] > data2[i] ? True : False;
+			}
+			return result;
+		}
+
+		inline vector<uint8_t> operator>(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = (size / 4) * 4;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				__m256i mask = _mm256_cmpgt_epi64(a, b);
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] > num ? True : False;
+			}
+			return result;
+		}
+
+		// < 
+		
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator<(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i minus_ones = _mm256_set1_epi64x(-1);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				__m256i gt = _mm256_cmpgt_epi64(a, b);
+				__m256i eq = _mm256_cmpeq_epi64(a, b);
+
+				__m256i mask = _mm256_andnot_si256(gt, _mm256_andnot_si256(eq, minus_ones));
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] < data2[i] ? True : False;
+			}
+			return result;
+		}
+
+		inline vector<uint8_t> operator<(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			__m256i minus_ones = _mm256_set1_epi64x(-1);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				__m256i gt = _mm256_cmpgt_epi64(a, b);
+				__m256i eq = _mm256_cmpeq_epi64(a, b);
+
+				__m256i mask = _mm256_andnot_si256(gt, _mm256_andnot_si256(eq, minus_ones));
+
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] < num ? True : False;
+			}
+			return result;
+		}
+
+		// >=
+
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator>=(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				__m256i gt = _mm256_cmpgt_epi64(a, b);
+				__m256i eq = _mm256_cmpeq_epi64(a, b);
+
+				__m256i mask = _mm256_or_si256(gt, eq);
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] >= data2[i] ? True : False;
+			}
+			return result;
+		}
+
+		inline vector<uint8_t> operator>=(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				__m256i gt = _mm256_cmpgt_epi64(a, b);
+				__m256i eq = _mm256_cmpeq_epi64(a, b);
+
+				__m256i mask = _mm256_or_si256(gt, eq);
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] >= num ? True : False;
+			}
+			return result;
+		}
+
+		// <=
+
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator<=(vector<uint64_t, otherCallDestructor>& other)
+		{
+#ifdef _DEBUG
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i minus_ones = _mm256_set1_epi64x(-1);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+				__m256i b = _mm256_loadu_epi64(&data2[i]);
+
+				__m256i mask = _mm256_andnot_si256(_mm256_cmpgt_epi64(a, b), minus_ones);
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] <= data2[i] ? True : False;
+			}
+			return result;
+		}
+
+		inline vector<uint8_t> operator<=(uint64_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* dataResult = result._data;
+
+			__m256i b = _mm256_set1_epi64x(num);
+
+			__m256i minus_ones = _mm256_set1_epi64x(-1);
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i a = _mm256_loadu_epi64(&data1[i]);
+
+				__m256i mask = _mm256_andnot_si256(_mm256_cmpgt_epi64(a, b), minus_ones);
+				__m128i mask1 = _mm256_castsi256_si128(mask);
+				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				dataResult[i] = data1[i] <= num ? True : False;
+			}
+			return result;
+		}
+
+		// Functions
+
+		// Pow
+
+		inline vector<uint64_t> pow(uint64_t exponent)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i result_pow = _mm256_set1_epi64x(1);
+				__m256i base = _mm256_loadu_epi64(&data1[i]);
+				uint64_t exp = exponent;
+				while (exp > 0) {
+					if (exp % 2 == 1) {
+						result_pow = _mm256_mul_epu32(result_pow, base);
+					}
+
+					base = _mm256_mul_epu32(base, base);
+					exp >>= 1;
+				}
+				_mm256_storeu_epi64(&dataResult[i], result_pow);
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				uint64_t result_pow = 1;
+				uint64_t base = data1[i];
+				uint64_t exp = exponent;
+				while (exp > 0) {
+					if (exp % 2 == 1) {
+						result_pow = result_pow * base;
+					}
+
+					base = base * base;
+					exp >>= 1;
+				}
+				dataResult[i] = result_pow;
+			}
+			return result;
+		}
+
+		template <bool otherCallDestructor>
+		inline vector<uint64_t> pow(vector<uint64_t, otherCallDestructor>& other)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			__m256i one = _mm256_set1_epi64x(1);
+			__m256i zero = _mm256_setzero_si256();
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i result_pow = _mm256_set1_epi64x(1);
+
+				__m256i base = _mm256_loadu_epi64(&data1[i]);
+				__m256i exps = _mm256_loadu_epi64(&data2[i]);
+
+				while (_mm256_movemask_epi8(_mm256_cmpgt_epi64(exps, zero))) {
+					__m256i mask = _mm256_cmpeq_epi64(_mm256_and_si256(exps, one), one);
+					result_pow = _mm256_blendv_epi8(result_pow, _mm256_mul_epu32(result_pow, base), mask);
+					base = _mm256_mul_epu32(base, base);
+					exps = _mm256_srli_epi64(exps, 1);
+				}
+				_mm256_storeu_epi64(&dataResult[i], result_pow);
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				uint64_t result_pow = 1;
+				uint64_t base = data1[i];
+				uint64_t exp = data2[i];
+				while (exp > 0) {
+					if (exp % 2 == 1) {
+						result_pow = result_pow * base;
+					}
+
+					base = base * base;
+					exp >>= 1;
+				}
+				dataResult[i] = result_pow;
+			}
+			return result;
+		}
+
+		inline void self_pow(uint64_t exponent)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i result_pow = _mm256_set1_epi64x(1);
+				__m256i base = _mm256_loadu_epi64(&data1[i]);
+				uint64_t exp = exponent;
+				while (exp > 0) {
+					if (exp % 2 == 1) {
+						result_pow = _mm256_mul_epu32(result_pow, base);
+					}
+
+					base = _mm256_mul_epu32(base, base);
+					exp >>= 1;
+				}
+				_mm256_storeu_epi64(&data1[i], result_pow);
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				uint64_t result_pow = 1;
+				uint64_t base = data1[i];
+				uint64_t exp = exponent;
+				while (exp > 0) {
+					if (exp % 2 == 1) {
+						result_pow = result_pow * base;
+					}
+
+					base = base * base;
+					exp >>= 1;
+				}
+				data1[i] = result_pow;
+			}
+		}
+
+		template <bool otherCallDestructor>
+		inline void self_pow(vector<uint64_t, otherCallDestructor>& other)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			__m256i one = _mm256_set1_epi64x(1);
+			__m256i zero = _mm256_setzero_si256();
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				__m256i result_pow = _mm256_set1_epi64x(1);
+
+				__m256i base = _mm256_loadu_epi64(&data1[i]);
+				__m256i exps = _mm256_loadu_epi64(&data2[i]);
+
+				while (_mm256_movemask_epi8(_mm256_cmpgt_epi64(exps, zero))) {
+					__m256i mask = _mm256_cmpeq_epi64(_mm256_and_si256(exps, one), one);
+					result_pow = _mm256_blendv_epi8(result_pow, _mm256_mul_epu32(result_pow, base), mask);
+					base = _mm256_mul_epu32(base, base);
+					exps = _mm256_srli_epi64(exps, 1);
+				}
+				_mm256_storeu_epi64(&data1[i], result_pow);
+			}
+			for (size_t i = finalPos; i < size; i++)
+			{
+				uint64_t result_pow = 1;
+				uint64_t base = data1[i];
+				uint64_t exp = data2[i];
+				while (exp > 0) {
+					if (exp % 2 == 1) {
+						result_pow = result_pow * base;
+					}
+
+					base = base * base;
+					exp >>= 1;
+				}
+				data1[i] = result_pow;
+			}
+		}
+
+		// <<
+
+		inline vector<uint64_t> operator<<(int shift)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				_mm256_storeu_epi64(&dataResult[i], _mm256_slli_epi64(_mm256_loadu_epi64(&data1[i]), shift));
+			}
+			for (size_t i = finalPos; i < size; i += 4)
+			{
+				dataResult[i] = data1[i] << shift;
+			}
+			return result;
+		}
+
+		template <bool otherCallDestructor>
+		inline vector<uint64_t> operator<<(vector<uint64_t, otherCallDestructor> other)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				_mm256_storeu_epi64(&dataResult[i], _mm256_sllv_epi64(_mm256_loadu_epi64(&data1[i]), _mm256_loadu_epi64(&data2[i])));
+			}
+			for (size_t i = finalPos; i < size; i += 4)
+			{
+				dataResult[i] = data1[i] << data2[i];
+			}
+			return result;
+		}
+
+		inline void operator<<=(int shift)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				_mm256_storeu_epi64(&data1[i], _mm256_slli_epi64(_mm256_loadu_epi64(&data1[i]), shift));
+			}
+			for (size_t i = finalPos; i < size; i += 4)
+			{
+				data1[i] <<= shift;
+			}
+		}
+
+		template <bool otherCallDestructor>
+		inline void operator<<=(vector<uint64_t, otherCallDestructor> other)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				_mm256_storeu_epi64(&data1[i], _mm256_sllv_epi64(_mm256_loadu_epi64(&data1[i]), _mm256_loadu_epi64(&data2[i])));
+			}
+			for (size_t i = finalPos; i < size; i += 4)
+			{
+				data1[i] <<= data2[i];
+			}
+		}
+
+		// >>
+
+		inline vector<uint64_t> operator>>(int shift)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				_mm256_storeu_epi64(&dataResult[i], _mm256_srli_epi64(_mm256_loadu_epi64(&data1[i]), shift));
+			}
+			for (size_t i = finalPos; i < size; i += 4)
+			{
+				dataResult[i] = data1[i] >> shift;
+			}
+			return result;
+		}
+
+		template <bool otherCallDestructor>
+		inline vector<uint64_t> operator>>(vector<uint64_t, otherCallDestructor> other)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				_mm256_storeu_epi64(&dataResult[i], _mm256_srlv_epi64(_mm256_loadu_epi64(&data1[i]), _mm256_loadu_epi64(&data2[i])));
+			}
+			for (size_t i = finalPos; i < size; i += 4)
+			{
+				dataResult[i] = data1[i] >> data2[i];
+			}
+			return result;
+		}
+
+		inline void operator>>=(int shift)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				_mm256_storeu_epi64(&data1[i], _mm256_srli_epi64(_mm256_loadu_epi64(&data1[i]), shift));
+			}
+			for (size_t i = finalPos; i < size; i += 4)
+			{
+				data1[i] >>= shift;
+			}
+		}
+
+		template <bool otherCallDestructor>
+		inline void operator>>=(vector<uint64_t, otherCallDestructor> other)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+			uint64_t* data2 = other._data;
+
+			for (size_t i = 0; i < finalPos; i += 4)
+			{
+				_mm256_storeu_epi64(&data1[i], _mm256_srlv_epi64(_mm256_loadu_epi64(&data1[i]), _mm256_loadu_epi64(&data2[i])));
+			}
+			for (size_t i = finalPos; i < size; i += 4)
+			{
+				data1[i] >>= data2[i];
+			}
+		}
+
+		// Cast
+
+		template<typename T>
+		inline vector<T> cast()
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint64_t* data1 = this->_data;
+
+			vector<T> result(size);
+
+			T* dataResult = result._data;
+
+			if constexpr (std::is_same<T, double>)
+			{
+				masks_uint64_to_double;
+				for (size_t i = 0; i < finalPos; i += 4)
+				{
+					uint64_to_double(_mm256_loadu_epi64(&data1[i]));
+					_mm256_store_pd(&dataResult[i], uint64ToDouble);
+				}
+			}
+			else if constexpr (std::is_same<T, int>)
+			{
+				__m256i indices = _mm256_setr_epi32(0, 2, 4, 6, 7, 5, 3, 1);
+
+				for (size_t i = 0; i < finalPos; i += 4)
+				{
+					_mm_storeu_epi32(&dataResult[i], _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(_mm256_loadu_epi64(&data1[i]), indices)));
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < size; i++)
+				{
+					dataResult[i] = static_cast<T>(data1[i]);
+				}
+			}
+			return result;
+		}
+
+	private:
+		uint64_t* _data;
+		size_t _size;
+		size_t finalPos;
+	};
+
+	template <bool thisCallDestructor>
+	class vector<double, thisCallDestructor>
 	{
 	public:
 		inline vector(size_t size) : _data(new double[size]), _size(size), finalPos((size / 4) * 4) {}
 
 		inline vector(double* data, size_t size) : _data(data), _size(size), finalPos((size / 4) * 4) {}
 
-		friend class matrix<double>;
+		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
 
-		friend class matrix<float>;
+		// Friend class
 
-		friend class matrix<uint8_t>;
+		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		friend class matrix;
 
-		friend class vector<uint8_t>;
+		template <typename T, bool otherCallDestructor>
+		friend class vector;
 
-		friend class vector<float>;
+		// Friend function
 
-		friend class vector<uint64_t>;
+		template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
+		friend inline vector<double> where(vector<uint8_t, callDestructor1>&, vector<double, callDestructor2>&, vector<double, callDestructor3>&);
 
-		friend class vector<int>;
+		template <bool callDestructor1, bool callDestructor2>
+		friend inline double dot(vector<double, callDestructor1>&, vector<double, callDestructor2>&);
 
-		friend inline vector<double> where(vector<uint8_t>&, vector<double>&, vector<double>&);
-
-		friend inline double dot(vector<double>&, vector<double>&);
-
-		friend inline vector<double> dot(matrix<double>&, vector<double>&);
+		template<bool otherCallDestructor>
+		friend std::ostream& operator<<(std::ostream& os, const vector<double, otherCallDestructor>& vector)
+		{
+			for (size_t i = 0; i < vector._size; i++)
+			{
+				std::cout << vector._data[i] << std::endl;
+			}
+			return os;
+		}
 
 		inline double& operator[](size_t index)
 		{
@@ -132,8 +1896,6 @@ namespace matrix
 		{
 			size_t size = this->_size;
 
-			size_t finalPos = this->finalPos;
-
 			double* data1 = this->_data;
 
 			for (size_t i = 0; i < size; i++)
@@ -152,8 +1914,6 @@ namespace matrix
 			size_t finalPos = this->finalPos;
 
 			double* data1 = this->_data;
-
-			size_t finalPos = this->finalPos;
 
 			__m256i random;
 
@@ -200,10 +1960,11 @@ namespace matrix
 
 		// +
 
-		inline vector<double> operator+(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<double> operator+(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -260,10 +2021,11 @@ namespace matrix
 			return result;
 		}
 
-		inline void operator+=(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline void operator+=(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -312,10 +2074,11 @@ namespace matrix
 
 		// -
 
-		inline vector<double> operator-(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<double> operator-(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -372,10 +2135,11 @@ namespace matrix
 			return result;
 		}
 
-		inline void operator-=(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline void operator-=(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -424,10 +2188,11 @@ namespace matrix
 
 		// *
 
-		inline vector<double> operator*(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<double> operator*(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -484,10 +2249,11 @@ namespace matrix
 			return result;
 		}
 
-		inline void operator*=(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline void operator*=(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -536,10 +2302,11 @@ namespace matrix
 
 		// /
 
-		inline vector<double> operator/(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<double> operator/(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -596,10 +2363,11 @@ namespace matrix
 			return result;
 		}
 
-		inline void operator/=(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline void operator/=(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -648,10 +2416,11 @@ namespace matrix
 
 		// ==
 
-		inline vector<uint8_t> operator==(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator==(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -728,7 +2497,8 @@ namespace matrix
 
 		// !=
 
-		inline vector<uint8_t> operator!=(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator!=(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -808,7 +2578,8 @@ namespace matrix
 
 		// >
 
-		inline vector<uint8_t> operator>(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator>(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size > other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -888,10 +2659,11 @@ namespace matrix
 
 		// >=
 
-		inline vector<uint8_t> operator>=(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator>=(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -966,10 +2738,11 @@ namespace matrix
 
 		// <
 
-		inline vector<uint8_t> operator<(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator<(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -1044,10 +2817,11 @@ namespace matrix
 
 		// <=
 
-		inline vector<uint8_t> operator<=(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator<=(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -1149,10 +2923,11 @@ namespace matrix
 			return result;
 		}
 
-		inline vector<double> pow(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<double> pow(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -1198,10 +2973,11 @@ namespace matrix
 			}
 		}
 
-		inline void self_pow(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline void self_pow(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -1251,10 +3027,11 @@ namespace matrix
 			return result;
 		}
 
-		inline vector<double> root(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline vector<double> root(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -1304,10 +3081,11 @@ namespace matrix
 			}
 		}
 
-		inline void self_root(vector<double>& other)
+		template<bool otherCallDestructor>
+		inline void self_root(vector<double, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -1852,7 +3630,7 @@ namespace matrix
 
 		// Ceil
 
-		inline vector<double> floor()
+		inline vector<double> ceil()
 		{
 			size_t size = this->_size;
 
@@ -1875,7 +3653,7 @@ namespace matrix
 			return result;
 		}
 
-		inline void self_floor()
+		inline void self_ceil()
 		{
 			size_t size = this->_size;
 
@@ -1953,11 +3731,11 @@ namespace matrix
 			{
 				__m256d a = _mm256_load_pd(&data1[i]);
 
-				int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _max, _CMP_GT_OQ));
+				__m256d mask = _mm256_cmp_pd(a, _max, _CMP_GT_OQ);
 
-				maxIndices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(maxIndices), _mm256_castsi256_pd(indices), mask));
+				maxIndices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(maxIndices), _mm256_castsi256_pd(indices), mask));
 
-				_max = _mm256_blend_pd(_max, a, mask);
+				_max = _mm256_blendv_pd(_max, a, mask);
 
 				indices = _mm256_add_epi64(indices, four);
 			}
@@ -1970,7 +3748,7 @@ namespace matrix
 			for (size_t i = 0; i < 4; i++)
 			{
 				double data = maxArr[i];
-				if (max > data)
+				if (data > max)
 				{
 					max = data;
 					indice = maxIndicesArr[i];
@@ -1979,7 +3757,7 @@ namespace matrix
 			for (size_t i = finalPos; i < size; i++)
 			{
 				double data = data1[i];
-				if (max > data)
+				if (data > max)
 				{
 					max = data;
 					indice = i;
@@ -2045,11 +3823,11 @@ namespace matrix
 			{
 				__m256d a = _mm256_load_pd(&data1[i]);
 
-				int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _min, _CMP_LT_OQ));
+				__m256d mask = _mm256_cmp_pd(a, _min, _CMP_LT_OQ);
 
-				minIndices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(minIndices), _mm256_castsi256_pd(indices), mask));
+				minIndices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(minIndices), _mm256_castsi256_pd(indices), mask));
 
-				_min = _mm256_blend_pd(_min, a, mask);
+				_min = _mm256_blendv_pd(_min, a, mask);
 
 				indices = _mm256_add_epi64(indices, four);
 			}
@@ -2062,7 +3840,7 @@ namespace matrix
 			for (size_t i = 0; i < 4; i++)
 			{
 				double data = minArr[i];
-				if (min < data)
+				if (data < min)
 				{
 					min = data;
 					indice = minIndicesArr[i];
@@ -2071,7 +3849,7 @@ namespace matrix
 			for (size_t i = finalPos; i < size; i++)
 			{
 				double data = data1[i];
-				if (min < data)
+				if (data < min)
 				{
 					min = data;
 					indice = i;
@@ -2166,7 +3944,8 @@ namespace matrix
 				__m256d a = _mm256_load_pd(&data1[i]);
 
 				_sum = _mm256_add_pd(_sum, a);
-				_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+				
+				_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 			}
 			__m128d vlow = _mm256_castpd256_pd128(_sum);
 			__m128d vhigh = _mm256_extractf128_pd(_sum, 1);
@@ -2175,12 +3954,12 @@ namespace matrix
 			__m128d high64 = _mm_unpackhi_pd(vlow, vlow);
 			double sum = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 			//--
-			__m128d vlow1 = _mm256_castpd256_pd128(_sumSquare);
+			vlow = _mm256_castpd256_pd128(_sumSquare);
 			vhigh = _mm256_extractf128_pd(_sumSquare, 1);
-			vlow = _mm_add_pd(vlow1, vhigh);
+			vlow = _mm_add_pd(vlow, vhigh);
 
-			high64 = _mm_unpackhi_pd(vlow1, vlow1);
-			double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow1, high64));
+			high64 = _mm_unpackhi_pd(vlow, vlow);
+			double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 
 			for (size_t i = finalPos; i < size; i++)
 			{
@@ -2583,33 +4362,37 @@ namespace matrix
 		size_t finalPos;
 	};
 
-	template <>
-	class vector<float>
+	template <bool thisCallDestructor>
+	class vector<float, thisCallDestructor>
 	{
 	public:
 		inline vector(size_t size) : _data(new float[size]), _size(size), finalPos((size / 8) * 8) {}
 
 		inline vector(float* data, size_t size) : _data(data), _size(size), finalPos((size / 8) * 8) {}
 
-		friend class matrix<float>;
+		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
 
-		friend class matrix<double>;
+		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		friend class matrix;
 
-		friend class vector<double>;
+		template <typename T, bool otherCallDestructor>
+		friend class vector;
 
-		friend class vector<uint8_t>;
+		template<bool otherCallDestructor>
+		friend std::ostream& operator<<(std::ostream& os, const vector<float, otherCallDestructor>& vector)
+		{
+			for (size_t i = 0; i < vector._size; i++)
+			{
+				std::cout << vector._data[i] << std::endl;
+			}
+			return os;
+		}
 
-		friend class vector<float>;
+		template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
+		friend inline vector<float> where(vector<uint8_t, callDestructor1>&, vector<float, callDestructor2>&, vector<float, callDestructor3>&);
 
-		friend class vector<uint64_t>;
-
-		friend class vector<int>;
-
-		friend inline vector<float> where(vector<uint8_t>&, vector<float>&, vector<float>&);
-
-		friend inline float dot(vector<float>&, vector<float>&);
-
-		friend inline vector<float> dot(matrix<float>&, vector<float>&);
+		template <bool callDestructor1, bool callDestructor2>
+		friend inline float dot(vector<float, callDestructor1>&, vector<float, callDestructor2>&);
 
 		inline float& operator[](size_t index)
 		{
@@ -2648,8 +4431,6 @@ namespace matrix
 			size_t finalPos = this->finalPos;
 
 			float* data1 = this->_data;
-
-			size_t finalPos = this->finalPos;
 
 			__m256i random;
 
@@ -2691,10 +4472,11 @@ namespace matrix
 
 		// +
 
-		inline vector<float> operator+(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<float> operator+(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -2749,10 +4531,11 @@ namespace matrix
 			return result;
 		}
 
-		inline void operator+=(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline void operator+=(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -2799,10 +4582,11 @@ namespace matrix
 
 		// -
 
-		inline vector<float> operator-(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<float> operator-(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -2857,10 +4641,11 @@ namespace matrix
 			return result;
 		}
 
-		inline void operator-=(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline void operator-=(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -2907,10 +4692,11 @@ namespace matrix
 
 		// *
 
-		inline vector<float> operator*(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<float> operator*(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -2965,10 +4751,11 @@ namespace matrix
 			return result;
 		}
 
-		inline void operator*=(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline void operator*=(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3015,10 +4802,11 @@ namespace matrix
 
 		// /
 
-		inline vector<float> operator/(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<float> operator/(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3073,10 +4861,11 @@ namespace matrix
 			return result;
 		}
 
-		inline void operator/=(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline void operator/=(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3123,10 +4912,11 @@ namespace matrix
 
 		// ==
 
-		inline vector<uint8_t> operator==(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator==(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3199,10 +4989,11 @@ namespace matrix
 
 		// !=
 
-		inline vector<uint8_t> operator!=(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator!=(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3275,10 +5066,11 @@ namespace matrix
 
 		// >
 
-		inline vector<uint8_t> operator>(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator>(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3353,10 +5145,11 @@ namespace matrix
 
 		// >=
 
-		inline vector<uint8_t> operator>=(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator>=(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3431,10 +5224,11 @@ namespace matrix
 
 		// <
 
-		inline vector<uint8_t> operator<(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator<(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3509,10 +5303,11 @@ namespace matrix
 
 		// <=
 
-		inline vector<uint8_t> operator<=(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<uint8_t> operator<=(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3614,10 +5409,11 @@ namespace matrix
 			return result;
 		}
 
-		inline vector<float> pow(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<float> pow(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3663,10 +5459,11 @@ namespace matrix
 			}
 		}
 
-		inline void self_pow(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline void self_pow(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3716,10 +5513,11 @@ namespace matrix
 			return result;
 		}
 
-		inline vector<float> root(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline vector<float> root(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -3769,10 +5567,11 @@ namespace matrix
 			}
 		}
 
-		inline void self_root(vector<float>& other)
+		template <bool otherCallDestructor>
+		inline void self_root(vector<float, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -4317,7 +6116,7 @@ namespace matrix
 
 		// Ceil
 
-		inline vector<float> floor()
+		inline vector<float> ceil()
 		{
 			size_t size = this->_size;
 
@@ -4340,7 +6139,7 @@ namespace matrix
 			return result;
 		}
 
-		inline void self_floor()
+		inline void self_ceil()
 		{
 			size_t size = this->_size;
 
@@ -4422,11 +6221,11 @@ namespace matrix
 			{
 				__m128 a = _mm_load_ps(&data1[i]);
 
-				int mask = _mm_movemask_ps(_mm_cmp_ps(a, _max, _CMP_GT_OQ));
+				__m128 mask = _mm_cmp_ps(a, _max, _CMP_GT_OQ);
 
-				maxIndices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(maxIndices), _mm256_castsi256_pd(indices), mask));
+				maxIndices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(maxIndices), _mm256_castsi256_pd(indices), _mm256_castsi256_pd(_mm256_cvtepi32_epi64(_mm_castps_si128(mask)))));
 
-				_max = _mm_blend_ps(_max, a, mask);
+				_max = _mm_blendv_ps(_max, a, mask);
 
 				indices = _mm256_add_epi64(indices, four);
 			}
@@ -4439,7 +6238,7 @@ namespace matrix
 			for (size_t i = 0; i < 4; i++)
 			{
 				float data = maxArr[i];
-				if (max > data)
+				if (data > max)
 				{
 					max = data;
 					indice = maxIndicesArr[i];
@@ -4448,7 +6247,7 @@ namespace matrix
 			for (size_t i = finalPos; i < size; i++)
 			{
 				float data = data1[i];
-				if (max > data)
+				if (data > max)
 				{
 					max = data;
 					indice = i;
@@ -4521,11 +6320,11 @@ namespace matrix
 			{
 				__m128 a = _mm_load_ps(&data1[i]);
 
-				int mask = _mm_movemask_ps(_mm_cmp_ps(a, _min, _CMP_LT_OQ));
+				__m128 mask = _mm_cmp_ps(a, _min, _CMP_LT_OQ);
 
-				minIndices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(minIndices), _mm256_castsi256_pd(indices), mask));
+				minIndices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(minIndices), _mm256_castsi256_pd(indices), _mm256_castsi256_pd(_mm256_cvtepi32_epi64(_mm_castps_si128(mask)))));
 
-				_min = _mm_blend_ps(_min, a, mask);
+				_min = _mm_blendv_ps(_min, a, mask);
 
 				indices = _mm256_add_epi64(indices, four);
 			}
@@ -4538,7 +6337,7 @@ namespace matrix
 			for (size_t i = 0; i < 4; i++)
 			{
 				float data = minArr[i];
-				if (min < data)
+				if (data < min)
 				{
 					min = data;
 					indice = minIndicesArr[i];
@@ -4547,7 +6346,7 @@ namespace matrix
 			for (size_t i = finalPos; i < size; i++)
 			{
 				float data = data1[i];
-				if (min < data)
+				if (data < min)
 				{
 					min = data;
 					indice = i;
@@ -4676,8 +6475,8 @@ namespace matrix
 			}
 			if (mean != nullptr) *mean = sum / size_f;
 
-			double variance = (sumSquare - (sum * sum / size_f)) / (size_f - ddof);
-			double std = std::sqrt(variance);
+			float variance = (sumSquare - (sum * sum / size_f)) / (size_f - ddof);
+			float std = std::sqrt(variance);
 			return std;
 		}
 
@@ -5062,1457 +6861,61 @@ namespace matrix
 		size_t finalPos;
 	};
 
-	template <>
-	class vector<uint64_t>
-	{
-	public:
-		vector(size_t size) : _data(new uint64_t[size]), _size(size) {}
-
-		vector(uint64_t* data, size_t size) : _data(data), _size(size) {}
-
-		friend class matrix<double>;
-
-		friend class vector<double>;
-
-		friend class vector<uint8_t>;
-
-		friend class vector<int>;
-
-		friend inline vector<uint64_t> where(vector<uint8_t>&, vector<uint64_t>&, vector<uint64_t>&);
-
-		uint64_t* data() { return this->_data; }
-
-		size_t size() { return this->_size; }
-
-		uint64_t& operator[](size_t index)
-		{
-			uint64_t* data = this->_data;
-			return data[index];
-		}
-
-		const uint64_t& operator[](size_t index) const
-		{
-			uint64_t* data = this->_data;
-			return data[index];
-		}
-
-		vector<uint64_t> operator[](vector<uint64_t>& other)
-		{
-			size_t size = other._size;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < size; i++)
-			{
-				dataResult[i] = data1[data2[i]];
-			}
-			return result;
-		}
-
-		// Set Constant
-
-		void set_const(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			for (size_t i = 0; i < size; i++)
-			{
-				data1[i] = num;
-			}
-		}
-
-		// +
-
-		vector<uint64_t> operator+(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_add_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] + data2[i];
-			}
-			return result;
-		}
-
-		vector<uint64_t> operator+(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_add_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] + num;
-			}
-			return result;
-		}
-
-		void operator+=(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				_mm256_storeu_epi64(&data1[i], _mm256_add_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] += data2[i];
-			}
-		}
-
-		void operator+=(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				_mm256_storeu_epi64(&data1[i], _mm256_add_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] += num;
-			}
-		}
-
-		// -
-
-		vector<uint64_t> operator-(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_sub_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] - data2[i];
-			}
-			return result;
-		}
-
-		vector<uint64_t> operator-(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_sub_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] - num;
-			}
-			return result;
-		}
-
-		void operator-=(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				_mm256_storeu_epi64(&data1[i], _mm256_sub_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] -= data2[i];
-			}
-		}
-
-		void operator-=(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				_mm256_storeu_epi64(&data1[i], _mm256_sub_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] -= num;
-			}
-		}
-		
-		// *
-
-		vector<uint64_t> operator*(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_mul_epu32(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] * data2[i];
-			}
-			return result;
-		}
-
-		vector<uint64_t> operator*(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_mul_epu32(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] * num;
-			}
-			return result;
-		}
-
-		void operator*=(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				_mm256_storeu_epi64(&data1[i], _mm256_mul_epu32(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] *= data2[i];
-			}
-		}
-
-		void operator*=(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				_mm256_storeu_epi64(&data1[i], _mm256_mul_epu32(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] *= num;
-			}
-		}
-
-		// /
-
-		vector<uint64_t> operator/(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_div_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] / data2[i];
-			}
-			return result;
-		}
-
-		vector<uint64_t> operator/(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_div_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] / num;
-			}
-			return result;
-		}
-
-		void operator/=(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				_mm256_storeu_epi64(&data1[i], _mm256_div_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] /= data2[i];
-			}
-		}
-
-		void operator/=(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				_mm256_storeu_epi64(&data1[i], _mm256_div_epi64(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] /= num;
-			}
-		}
-
-		// ===
-
-		vector<uint8_t> operator==(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-				
-				__m256i mask = _mm256_cmpeq_epi64(a, b);
-
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] == data2[i] ? True : False;
-			}
-			return result;
-		}
-
-		vector<uint8_t> operator==(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				__m256i mask = _mm256_cmpeq_epi64(a, b);
-
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] == num ? True : False;
-			}
-			return result;
-		}
-
-		// !=
-
-		vector<uint8_t> operator!=(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i minus_ones = _mm256_set1_epi64x(-1);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-				
-				__m256i mask = _mm256_andnot_si256(_mm256_cmpeq_epi64(a, b), minus_ones);
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] != data2[i] ? True : False;
-			}
-			return result;
-		}
-
-		vector<uint8_t> operator!=(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			__m256i minus_ones = _mm256_set1_epi64x(-1);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				__m256i mask = _mm256_andnot_si256((_mm256_cmpeq_epi64(a, b)), minus_ones);
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] != num ? True : False;
-			}
-			return result;
-		}
-
-		// >
-
-		vector<uint8_t> operator>(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				__m256i mask = _mm256_cmpgt_epi64(a, b);
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] > data2[i] ? True : False;
-			}
-			return result;
-		}
-
-		vector<uint8_t> operator>(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = (size / 4) * 4;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				__m256i mask = _mm256_cmpgt_epi64(a, b);
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] > num ? True : False;
-			}
-			return result;
-		}
-
-		// < 
-
-		vector<uint8_t> operator<(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i minus_ones = _mm256_set1_epi64x(-1);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				__m256i gt = _mm256_cmpgt_epi64(a, b);
-				__m256i eq = _mm256_cmpeq_epi64(a, b);
-
-				__m256i mask = _mm256_andnot_si256(gt, _mm256_andnot_si256(eq, minus_ones));
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] < data2[i] ? True : False;
-			}
-			return result;
-		}
-
-		vector<uint8_t> operator<(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			__m256i minus_ones = _mm256_set1_epi64x(-1);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				__m256i gt = _mm256_cmpgt_epi64(a, b);
-				__m256i eq = _mm256_cmpeq_epi64(a, b);
-
-				__m256i mask = _mm256_andnot_si256(gt, _mm256_andnot_si256(eq, minus_ones));
-
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] < num ? True : False;
-			}
-			return result;
-		}
-
-		// >=
-
-		vector<uint8_t> operator>=(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				__m256i gt = _mm256_cmpgt_epi64(a, b);
-				__m256i eq = _mm256_cmpeq_epi64(a, b);
-
-				__m256i mask = _mm256_or_si256(gt, eq);
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] >= data2[i] ? True : False;
-			}
-			return result;
-		}
-
-		vector<uint8_t> operator>=(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-
-				__m256i gt = _mm256_cmpgt_epi64(a, b);
-				__m256i eq = _mm256_cmpeq_epi64(a, b);
-
-				__m256i mask = _mm256_or_si256(gt, eq);
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] >= num ? True : False;
-			}
-			return result;
-		}
-
-		// <=
-
-		vector<uint8_t> operator<=(vector<uint64_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i minus_ones = _mm256_set1_epi64x(-1);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				__m256i b = _mm256_loadu_epi64(&data2[i]);
-
-				__m256i mask = _mm256_andnot_si256(_mm256_cmpgt_epi64(a, b), minus_ones);
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] <= data2[i] ? True : False;
-			}
-			return result;
-		}
-
-		vector<uint8_t> operator<=(uint64_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi64x(num);
-
-			__m256i minus_ones = _mm256_set1_epi64x(-1);
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i a = _mm256_loadu_epi64(&data1[i]);
-				
-				__m256i mask = _mm256_andnot_si256(_mm256_cmpgt_epi64(a, b), minus_ones);
-				__m128i mask1 = _mm256_castsi256_si128(mask);
-				__m128i mask2 = _mm256_extracti128_si256(mask, 1);
-
-				mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
-				mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
-
-				__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
-
-				_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] <= num ? True : False;
-			}
-			return result;
-		}
-
-		// Functions
-
-		// Pow
-
-		vector<uint64_t> pow(uint64_t exponent)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i result_pow = _mm256_set1_epi64x(1);
-				__m256i base = _mm256_loadu_epi64(&data1[i]);
-				uint64_t exp = exponent;
-				while (exp > 0) {
-					if (exp % 2 == 1) {
-						result_pow = _mm256_mul_epu32(result_pow, base);
-					}
-
-					base = _mm256_mul_epu32(base, base);
-					exp >>= 1;
-				}
-				_mm256_storeu_epi64(&dataResult[i], result_pow);
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				uint64_t result_pow = 1;
-				uint64_t base = data1[i];
-				uint64_t exp = exponent;
-				while (exp > 0) {
-					if (exp % 2 == 1) {
-						result_pow = result_pow * base;
-					}
-
-					base = base * base;
-					exp >>= 1;
-				}
-				dataResult[i] = result_pow;
-			}
-			return result;
-		}
-
-		vector<uint64_t> pow(vector<uint64_t>& other)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			__m256i one = _mm256_set1_epi64x(1);
-			__m256i zero = _mm256_setzero_si256();
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i result_pow = _mm256_set1_epi64x(1);
-
-				__m256i base = _mm256_loadu_epi64(&data1[i]);
-				__m256i exps = _mm256_loadu_epi64(&data2[i]);
-
-				while (_mm256_movemask_epi8(_mm256_cmpgt_epi64(exps, zero))) {
-					__m256i mask = _mm256_cmpeq_epi64(_mm256_and_si256(exps, one), one);
-					result_pow = _mm256_blendv_epi8(result_pow, _mm256_mul_epu32(result_pow, base), mask);
-					base = _mm256_mul_epu32(base, base);
-					exps = _mm256_srli_epi64(exps, 1);
-				}
-				_mm256_storeu_epi64(&dataResult[i], result_pow);
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				uint64_t result_pow = 1;
-				uint64_t base = data1[i];
-				uint64_t exp = data2[i];
-				while (exp > 0) {
-					if (exp % 2 == 1) {
-						result_pow = result_pow * base;
-					}
-
-					base = base * base;
-					exp >>= 1;
-				}
-				dataResult[i] = result_pow;
-			}
-			return result;
-		}
-
-		void self_pow(uint64_t exponent)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i result_pow = _mm256_set1_epi64x(1);
-				__m256i base = _mm256_loadu_epi64(&data1[i]);
-				uint64_t exp = exponent;
-				while (exp > 0) {
-					if (exp % 2 == 1) {
-						result_pow = _mm256_mul_epu32(result_pow, base);
-					}
-
-					base = _mm256_mul_epu32(base, base);
-					exp >>= 1;
-				}
-				_mm256_storeu_epi64(&data1[i], result_pow);
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				uint64_t result_pow = 1;
-				uint64_t base = data1[i];
-				uint64_t exp = exponent;
-				while (exp > 0) {
-					if (exp % 2 == 1) {
-						result_pow = result_pow * base;
-					}
-
-					base = base * base;
-					exp >>= 1;
-				}
-				data1[i] = result_pow;
-			}
-		}
-
-		void self_pow(vector<uint64_t>& other)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			__m256i one = _mm256_set1_epi64x(1);
-			__m256i zero = _mm256_setzero_si256();
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				__m256i result_pow = _mm256_set1_epi64x(1);
-
-				__m256i base = _mm256_loadu_epi64(&data1[i]);
-				__m256i exps = _mm256_loadu_epi64(&data2[i]);
-
-				while (_mm256_movemask_epi8(_mm256_cmpgt_epi64(exps, zero))) {
-					__m256i mask = _mm256_cmpeq_epi64(_mm256_and_si256(exps, one), one);
-					result_pow = _mm256_blendv_epi8(result_pow, _mm256_mul_epu32(result_pow, base), mask);
-					base = _mm256_mul_epu32(base, base);
-					exps = _mm256_srli_epi64(exps, 1);
-				}
-				_mm256_storeu_epi64(&data1[i], result_pow);
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				uint64_t result_pow = 1;
-				uint64_t base = data1[i];
-				uint64_t exp = data2[i];
-				while (exp > 0) {
-					if (exp % 2 == 1) {
-						result_pow = result_pow * base;
-					}
-
-					base = base * base;
-					exp >>= 1;
-				}
-				data1[i] = result_pow;
-			}
-		}
-
-		// <<
-
-		vector<uint64_t> operator<<(int shift)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				_mm256_storeu_epi64(&dataResult[i], _mm256_slli_epi64(_mm256_loadu_epi64(&data1[i]), shift));
-			}
-			for (size_t i = finalPos; i < size; i += 4)
-			{
-				dataResult[i] = data1[i] << shift;
-			}
-			return result;
-		}
-
-		vector<uint64_t> operator<<(vector<uint64_t> other)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				_mm256_storeu_epi64(&dataResult[i], _mm256_sllv_epi64(_mm256_loadu_epi64(&data1[i]), _mm256_loadu_epi64(&data2[i])));
-			}
-			for (size_t i = finalPos; i < size; i += 4)
-			{
-				dataResult[i] = data1[i] << data2[i];
-			}
-			return result;
-		}
-
-		void operator<<=(int shift)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				_mm256_storeu_epi64(&data1[i], _mm256_slli_epi64(_mm256_loadu_epi64(&data1[i]), shift));
-			}
-			for (size_t i = finalPos; i < size; i += 4)
-			{
-				data1[i] <<= shift;
-			}
-		}
-
-		void operator<<=(vector<uint64_t> other)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				_mm256_storeu_epi64(&data1[i], _mm256_sllv_epi64(_mm256_loadu_epi64(&data1[i]), _mm256_loadu_epi64(&data2[i])));
-			}
-			for (size_t i = finalPos; i < size; i += 4)
-			{
-				data1[i] <<= data2[i];
-			}
-		}
-
-		// >>
-
-		vector<uint64_t> operator>>(int shift)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				_mm256_storeu_epi64(&dataResult[i], _mm256_srli_epi64(_mm256_loadu_epi64(&data1[i]), shift));
-			}
-			for (size_t i = finalPos; i < size; i += 4)
-			{
-				dataResult[i] = data1[i] >> shift;
-			}
-			return result;
-		}
-
-		vector<uint64_t> operator>>(vector<uint64_t> other)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint64_t> result(size);
-
-			uint64_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				_mm256_storeu_epi64(&dataResult[i], _mm256_srlv_epi64(_mm256_loadu_epi64(&data1[i]), _mm256_loadu_epi64(&data2[i])));
-			}
-			for (size_t i = finalPos; i < size; i += 4)
-			{
-				dataResult[i] = data1[i] >> data2[i];
-			}
-			return result;
-		}
-
-		void operator>>=(int shift)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				_mm256_storeu_epi64(&data1[i], _mm256_srli_epi64(_mm256_loadu_epi64(&data1[i]), shift));
-			}
-			for (size_t i = finalPos; i < size; i += 4)
-			{
-				data1[i] >>= shift;
-			}
-		}
-
-		void operator>>=(vector<uint64_t> other)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			for (size_t i = 0; i < finalPos; i += 4)
-			{
-				_mm256_storeu_epi64(&data1[i], _mm256_srlv_epi64(_mm256_loadu_epi64(&data1[i]), _mm256_loadu_epi64(&data2[i])));
-			}
-			for (size_t i = finalPos; i < size; i += 4)
-			{
-				data1[i] >>= data2[i];
-			}
-		}
-
-		// Cast
-
-		template<typename T>
-		vector<T> cast()
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint64_t* data1 = this->_data;
-
-			vector<T> result(size);
-
-			T* dataResult = result._data;
-
-			if constexpr (std::is_same<T, double>)
-			{
-				masks_uint64_to_double;
-				for (size_t i = 0; i < finalPos; i += 4)
-				{
-					uint64_to_double(_mm256_loadu_epi64(&data1[i]));
-					_mm256_store_pd(&dataResult[i], uint64ToDouble);
-				}
-			}
-			else if constexpr constexpr (std::is_same<T, int>)
-			{
-				__m256i indices = _mm256_setr_epi32(0, 2, 4, 6, 7, 5, 3, 1);
-
-				for (size_t i = 0; i < finalPos; i += 4)
-				{
-					_mm_storeu_epi32(&dataResult[i], _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(_mm256_loadu_epi64(&data1[i]), indices)));
-				}
-			}
-			else
-			{
-				for (size_t i = 0; i < size; i++)
-				{
-					dataResult[i] = static_cast<T>(data1[i]);
-				}
-			}
-			return result;
-		}
-
-	private:
-		uint64_t* _data;
-		size_t _size;
-		size_t finalPos;
-	};
-
-	template <>
-	class vector<int>
+	template <bool thisCallDestructor>
+	class vector<int, thisCallDestructor>
 	{
 	public:
 
-		vector(size_t size) : _data(new int[size]), _size(size) {}
+		inline vector(size_t size) : _data(new int[size]), _size(size), finalPos((size / 8) * 8) {}
 
-		vector(int* data, size_t size) : _data(data), _size(size), finalPos((size / 8) * 8) {}
+		inline vector(int* data, size_t size) : _data(data), _size(size), finalPos((size / 8) * 8) {}
 
-		friend class vector<uint64_t>;
-		friend class vector<double>;
-		friend class vector<float>;
-		friend class vector<uint8_t>;
+		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
 
-		friend inline vector<int> where(vector<uint8_t>&, vector<int>&, vector<int>&);
+		// Friend classes
 
-		int* data() { return this->_data; }
+		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		friend class matrix;
 
-		size_t size() { return this->_size; }
+		template <typename T, bool otherCallDestructor>
+		friend class vector;
 
-		int& operator[](size_t index)
+		// Friend functions
+
+		template<bool otherCallDestructor1, bool otherCallDestructor2, bool otherCallDestructor3>
+		friend inline vector<int> where(vector<uint8_t, otherCallDestructor1>&, vector<int, otherCallDestructor2>&, vector<int, otherCallDestructor3>&);
+
+		template<bool otherCallDestructor>
+		friend std::ostream& operator<<(std::ostream& os, const vector<int, otherCallDestructor>& vector)
+		{
+			for (size_t i = 0; i < vector._size; i++)
+			{
+				std::cout << vector._data[i] << std::endl;
+			}
+			return os;
+		}
+
+		// -----
+
+		inline int* data() { return this->_data; }
+
+		inline size_t size() { return this->_size; }
+
+		inline int& operator[](size_t index)
 		{
 			int* data = this->_data;
 			return data[index];
 		}
 
-		const int& operator[](size_t index) const
+		inline const int& operator[](size_t index) const
 		{
 			int* data = this->_data;
 			return data[index];
 		}
 
-		vector<int> operator[](vector<uint64_t>& other)
-		{
-			size_t size = other._size;
-
-			int* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<int> result(size);
-
-			int* dataResult = result._data;
-
-			for (size_t i = 0; i < size; i++)
-			{
-				dataResult[i] = data1[data2[i]];
-			}
-			return result;
-		}
-
 		// Set Constant
 
-		void set_const(int num)
+		inline void set_const(int num)
 		{
 			size_t size = this->_size;
 
@@ -6528,10 +6931,11 @@ namespace matrix
 
 		// +
 
-		vector<int> operator+(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<int> operator+(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -6559,7 +6963,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<int> operator+(int num)
+		inline vector<int> operator+(int num)
 		{
 			size_t size = this->_size;
 
@@ -6586,10 +6990,11 @@ namespace matrix
 			return result;
 		}
 
-		void operator+=(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline void operator+=(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -6612,7 +7017,7 @@ namespace matrix
 			}
 		}
 
-		void operator+=(int num)
+		inline void operator+=(int num)
 		{
 			size_t size = this->_size;
 
@@ -6636,10 +7041,11 @@ namespace matrix
 
 		// -
 
-		vector<int> operator-(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<int> operator-(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -6667,7 +7073,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<int> operator-(int num)
+		inline vector<int> operator-(int num)
 		{
 			size_t size = this->_size;
 
@@ -6694,10 +7100,11 @@ namespace matrix
 			return result;
 		}
 
-		void operator-=(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline void operator-=(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -6720,7 +7127,7 @@ namespace matrix
 			}
 		}
 
-		void operator-=(int num)
+		inline void operator-=(int num)
 		{
 			size_t size = this->_size;
 
@@ -6744,10 +7151,11 @@ namespace matrix
 
 		// *
 
-		vector<int> operator*(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<int> operator*(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -6775,7 +7183,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<int> operator*(int num)
+		inline vector<int> operator*(int num)
 		{
 			size_t size = this->_size;
 
@@ -6802,10 +7210,11 @@ namespace matrix
 			return result;
 		}
 
-		void operator*=(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline void operator*=(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -6828,7 +7237,7 @@ namespace matrix
 			}
 		}
 
-		void operator*=(int num)
+		inline void operator*=(int num)
 		{
 			size_t size = this->_size;
 
@@ -6852,10 +7261,11 @@ namespace matrix
 
 		// /
 
-		vector<int> operator/(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<int> operator/(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -6883,7 +7293,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<int> operator/(int num)
+		inline vector<int> operator/(int num)
 		{
 			size_t size = this->_size;
 
@@ -6910,10 +7320,11 @@ namespace matrix
 			return result;
 		}
 
-		void operator/=(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline void operator/=(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -6936,7 +7347,7 @@ namespace matrix
 			}
 		}
 
-		void operator/=(int num)
+		inline void operator/=(int num)
 		{
 			size_t size = this->_size;
 
@@ -6960,10 +7371,11 @@ namespace matrix
 
 		// ==
 
-		vector<uint8_t> operator==(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator==(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -7000,7 +7412,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<uint8_t> operator==(int num)
+		inline vector<uint8_t> operator==(int num)
 		{
 			size_t size = this->_size;
 
@@ -7038,10 +7450,11 @@ namespace matrix
 
 		// !=
 
-		vector<uint8_t> operator!=(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator!=(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -7080,7 +7493,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<uint8_t> operator!=(int num)
+		inline vector<uint8_t> operator!=(int num)
 		{
 			size_t size = this->_size;
 
@@ -7119,10 +7532,11 @@ namespace matrix
 
 		// >
 
-		vector<uint8_t> operator>(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator>(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -7158,7 +7572,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<uint8_t> operator>(int num)
+		inline vector<uint8_t> operator>(int num)
 		{
 			size_t size = this->_size;
 
@@ -7195,10 +7609,11 @@ namespace matrix
 
 		// < 
 
-		vector<uint8_t> operator<(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator<(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -7239,7 +7654,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<uint8_t> operator<(int num)
+		inline vector<uint8_t> operator<(int num)
 		{
 			size_t size = this->_size;
 
@@ -7282,10 +7697,11 @@ namespace matrix
 
 		// >=
 
-		vector<uint8_t> operator>=(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator>=(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -7324,7 +7740,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<uint8_t> operator>=(int num)
+		inline vector<uint8_t> operator>=(int num)
 		{
 			size_t size = this->_size;
 
@@ -7364,10 +7780,11 @@ namespace matrix
 
 		// <=
 
-		vector<uint8_t> operator<=(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<uint8_t> operator<=(vector<int, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
 #else
 #endif
 			size_t size = this->_size;
@@ -7405,7 +7822,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<uint8_t> operator<=(int num)
+		inline vector<uint8_t> operator<=(int num)
 		{
 			size_t size = this->_size;
 
@@ -7444,7 +7861,7 @@ namespace matrix
 
 		// Pow
 
-		vector<int> pow(int exponent)
+		inline vector<int> pow(int exponent)
 		{
 			size_t size = this->_size;
 
@@ -7493,7 +7910,8 @@ namespace matrix
 			return result;
 		}
 
-		vector<int> pow(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline vector<int> pow(vector<int, otherCallDestructor>& other)
 		{
 			size_t size = this->_size;
 
@@ -7545,7 +7963,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_pow(int exponent)
+		inline void self_pow(int exponent)
 		{
 			size_t size = this->_size;
 
@@ -7587,7 +8005,8 @@ namespace matrix
 			}
 		}
 
-		void self_pow(vector<int>& other)
+		template<bool otherCallDestructor>
+		inline void self_pow(vector<int, otherCallDestructor>& other)
 		{
 			size_t size = this->_size;
 
@@ -7637,7 +8056,7 @@ namespace matrix
 		// Cast
 
 		template<typename T>
-		vector<T> cast()
+		inline vector<T> cast()
 		{
 			size_t size = this->_size;
 
@@ -7687,7 +8106,7 @@ namespace matrix
 			{
 				size_t finalPos = this->finalPos;
 				__m256i zero = _mm256_setzero_si256();
-
+				__m256i indices = _mm256_setr_epi32(0, 7, 2, 3, 4, 5, 6, 1);
 				for (size_t i = 0; i < finalPos; i += 8)
 				{
 					__m256i mask = _mm256_cmpeq_epi32(_mm256_loadu_epi32(&data1[i]), zero);
@@ -7720,342 +8139,6 @@ namespace matrix
 		size_t finalPos;
 	};
 
-	template <>
-	class vector<uint8_t>
-	{
-	public:
-		vector(size_t size) : _data(new uint8_t[size]), _size(size) {}
-
-		vector(uint8_t* data, size_t size) : _data(data), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
-
-		friend class vector<uint64_t>;
-		friend class vector<int>;
-		friend class vector<double>;
-		friend class vector<float>;
-
-		friend inline vector<double> where(vector<uint8_t>& vector1, vector<double>& vector2, vector<double>& vector3);
-
-		friend inline vector<float> where(vector<uint8_t>&, vector<float>&, vector<float>&);
-
-		friend inline vector<uint64_t> where(vector<uint8_t>&, vector<uint64_t>&, vector<uint64_t>&);
-
-		friend inline vector<int> where(vector<uint8_t>&, vector<int>&, vector<int>&);
-
-		uint8_t* data() { return this->_data; }
-
-		size_t size() { return this->_size; }
-
-		uint8_t& operator[](size_t index)
-		{
-			uint8_t* data = this->_data;
-			return data[index];
-		}
-
-		const uint8_t& operator[](size_t index) const
-		{
-			uint8_t* data = this->_data;
-			return data[index];
-		}
-
-		vector<uint8_t> operator[](vector<uint64_t>& other)
-		{
-			size_t size = other._size;
-
-			uint8_t* data1 = this->_data;
-			uint64_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			for (size_t i = 0; i < size; i++)
-			{
-				dataResult[i] = data1[data2[i]];
-			}
-			return result;
-		}
-
-		// &&
-
-		vector<uint8_t> operator&&(vector<uint8_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint8_t* data1 = this->_data;
-			uint8_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 32)
-			{
-				__m256i a = _mm256_loadu_epi8(&data1[i]);
-				__m256i b = _mm256_loadu_epi8(&data2[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_and_si256(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] & data2[i];
-			}
-			return result;
-		}
-
-		vector<uint8_t> operator&&(uint8_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint8_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi8(num);
-
-			for (size_t i = 0; i < finalPos; i += 32)
-			{
-				__m256i a = _mm256_loadu_epi8(&data1[i]);
-
-				_mm256_storeu_epi8(&dataResult[i], _mm256_and_si256(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] & num;
-			}
-			return result;
-		}
-
-		// ||
-
-		vector<uint8_t> operator||(vector<uint8_t>& other)
-		{
-#ifdef _DEBUG
-			if (this->_size == other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint8_t* data1 = this->_data;
-			uint8_t* data2 = other._data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			for (size_t i = 0; i < finalPos; i += 32)
-			{
-				__m256i a = _mm256_loadu_epi8(&data1[i]);
-				__m256i b = _mm256_loadu_epi8(&data2[i]);
-
-				_mm256_storeu_epi64(&dataResult[i], _mm256_or_si256(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] | data2[i];
-			}
-			return result;
-		}
-
-		vector<uint8_t> operator||(uint8_t num)
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint8_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i b = _mm256_set1_epi8(num);
-
-			for (size_t i = 0; i < finalPos; i += 32)
-			{
-				__m256i a = _mm256_loadu_epi8(&data1[i]);
-
-				_mm256_storeu_epi8(&dataResult[i], _mm256_or_si256(a, b));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] | num;
-			}
-			return result;
-		}
-
-		// !
-
-		vector<uint8_t> operator!()
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint8_t* data1 = this->_data;
-
-			vector<uint8_t> result(size);
-
-			uint8_t* dataResult = result._data;
-
-			__m256i zero = _mm256_setzero_si256();
-
-			for (size_t i = 0; i < finalPos; i += 32)
-			{
-				__m256i a = _mm256_loadu_epi8(&data1[i]);
-
-				_mm256_storeu_epi8(&dataResult[i], _mm256_and_si256(a, zero));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				dataResult[i] = data1[i] & 0;
-			}
-			return result;
-		}
-
-		void self_not()
-		{
-			size_t size = this->_size;
-
-			size_t finalPos = this->finalPos;
-
-			uint8_t* data1 = this->_data;
-
-			__m256i zero = _mm256_setzero_si256();
-
-			for (size_t i = 0; i < finalPos; i += 32)
-			{
-				__m256i a = _mm256_loadu_epi8(&data1[i]);
-
-				_mm256_storeu_epi8(&data1[i], _mm256_and_si256(a, zero));
-			}
-			for (size_t i = finalPos; i < size; i++)
-			{
-				data1[i] = data1[i] & 0;
-			}
-		}
-
-		// Count
-
-		uint64_t count()
-		{
-			size_t size = this->_size;
-
-			size_t finalPos256 = this->finalPos256;
-
-			uint8_t* data1 = this->_data;
-
-			uint64_t sum = 0;
-
-			for (size_t i = 0; i < finalPos256; i += 256)
-			{
-				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i])));
-				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 32])));
-				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 64])));
-				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 96])));
-				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 128])));
-				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 160])));
-				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 192])));
-				sum += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i + 224])));
-			}
-			for (size_t i = finalPos256; i < size; i++)
-			{
-				if (data1[i]) sum++;
-			}
-		}
-
-		// Cast
-
-		template<typename T>
-		vector<T> cast()
-		{
-			size_t size = this->_size;
-
-			uint8_t* data1 = this->_data;
-
-			vector<T> result(size);
-
-			T* dataResult = result._data;
-
-			if constexpr (std::is_same<T, double>)
-			{
-				size_t finalPos = (this->_size / 4) * 4;
-				__m256d zero = _mm256_setzero_pd();
-				__m256d one = _mm256_set1_pd(1.0);
-
-				for (size_t i = 0; i < finalPos; i += 4)
-				{
-					_mm256_store_pd(&dataResult[i], _mm256_blend_pd(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
-				}
-				for (size_t i = finalPos; i < size; i++)
-				{
-					dataResult[i] = data1[i] ? 1.0 : 0.0;
-				}
-			}
-			else if constexpr (std::is_same<T, float>)
-			{
-				size_t finalPos = (this->_size / 8) * 8;
-				__m256 zero = _mm256_setzero_ps();
-				__m256 one = _mm256_set1_ps(1.0f);
-
-				for (size_t i = 0; i < finalPos; i += 8)
-				{
-					_mm256_store_ps(&dataResult[i], _mm256_blend_ps(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
-				}
-				for (size_t i = finalPos; i < size; i++)
-				{
-					dataResult[i] = data1[i] ? 1.0f : 0.0f;
-				}
-			}
-			else if constexpr (std::is_same<T, uint64_t>)
-			{
-				size_t finalPos = (this->_size / 4) * 4;
-				__m256i zero = _mm256_setzero_si256();
-				__m256i one = _mm256_set1_epi64x(1);
-
-				for (size_t i = 0; i < finalPos; i += 4)
-				{
-					_mm256_storeu_epi64(&dataResult[i], _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(one), _mm256_castsi256_pd(zero), _mm_movemask_epi8(_mm_loadu_epi8(&data1[i])))));
-				}
-				for (size_t i = finalPos; i < size; i++)
-				{
-					dataResult[i] = data1[i] ? 1 : 0;
-				}
-			}
-			else if constexpr (std::is_same<T, int>)
-			{
-				size_t finalPos = (this->_size / 8) * 8;
-				__m256i zero = _mm256_setzero_si256();
-				__m256i one = _mm256_set1_epi32(1);
-
-				for (size_t i = 0; i < finalPos; i += 8)
-				{
-					_mm256_storeu_epi32(&dataResult[i], _mm256_blend_epi32(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
-				}
-				for (size_t i = finalPos; i < size; i++)
-				{
-					dataResult[i] = data1[i] ? 1 : 0;
-				}
-			}
-		}
-
-	private:
-		uint8_t* _data;
-		size_t _size;
-		size_t finalPos, finalPos256;
-	};
-
 	template <bool thisTransposed, bool thisContiguous, bool thisCallDestructor>
 	class matrix<double, thisTransposed, thisContiguous, thisCallDestructor>
 	{
@@ -8065,13 +8148,12 @@ namespace matrix
 			_data(new double[rows * cols]),
 			_rows(rows),
 			_cols(cols),
-			_size(rows* cols),
+			_size(rows * cols),
 			actualRows(rows),
 			actualCols(cols),
-			contiguous(true),
 			finalPosRows((_rows / 4) * 4), 
 			finalPosCols((_cols / 4) * 4),
-			finalPosSize((_size / 4) * 4) {}
+			finalPosSize(((rows* cols) / 4) * 4) {}
 
 		inline matrix(double* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols) :
 			_data(data),
@@ -8080,29 +8162,62 @@ namespace matrix
 			_size(rows* cols),
 			actualRows(actualRows),
 			actualCols(actualCols),
-			contiguous(contiguous), 
 			finalPosRows((_rows / 4) * 4),
 			finalPosCols((_cols / 4) * 4),
 			finalPosSize((_size / 4) * 4) {}
 
 		~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
 
-		//Friend classes
+		// Friend classes
 
-		friend class matrix<uint8_t>;
+		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		friend class matrix;
 
-		friend class vector<double>;
+		template <typename T, bool otherCallDestructor>
+		friend class vector;
 
-		friend class vector<uint64_t>;
-
-		friend vector<double> dot(matrix<double>&, vector<double>&);
+		// Friend functions
 
 		template<bool returnTransposed, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
 			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-		friend inline matrix<double, returnTransposed> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
+		friend inline matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
 
-		template<bool returnTransposed>
-		friend inline matrix<double, returnTransposed> identity(size_t n);
+		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
+		friend std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+		{
+			size_t rows = matrix._rows;
+			size_t cols = matrix._cols;
+
+			double* data1 = matrix._data;
+
+			if constexpr (otherTransposed)
+			{
+				size_t actualRows = matrix.actualRows;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						std::cout << data1[j * actualRows + i] << " ";
+					}
+					std::cout << std::endl;
+				}
+			}
+			else
+			{
+				size_t actualCols = matrix.actualCols;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						std::cout << data1[i * actualCols + j] << " ";
+					}
+					std::cout << std::endl;
+				}
+			}
+			return os;
+		}
 
 		//----------------
 
@@ -8205,34 +8320,6 @@ namespace matrix
 			}
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
-		{
-			if constexpr (otherTransposed)
-			{
-				for (size_t i = 0; i < matrix._rows; i++)
-				{
-					for (size_t j = 0; j < matrix._cols; j++)
-					{
-						std::cout << this->[j * matrix.actualRows + i] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			else
-			{
-				for (size_t i = 0; i < matrix._rows; i++)
-				{
-					for (size_t j = 0; j < matrix._cols; j++)
-					{
-						std::cout << this->[i * matrix.actualCols + j] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			return os;
-		}
-
 		double& operator()(size_t row, size_t col)
 		{
 			if constexpr (thisTransposed)
@@ -8266,7 +8353,15 @@ namespace matrix
 
 			double* data1 = this->_data;
 
-			if constexpr (thisTransposed)
+			if constexpr (thisContiguous)
+			{
+				size_t size = this->_size;
+				for (size_t i = 0; i < size; i++)
+				{
+					data1[i] = num;
+				}
+			}
+			else if constexpr (thisTransposed)
 			{
 				size_t matrix1ActualRows = this->actualRows;
 				for (size_t i = 0; i < rows; i++)
@@ -8494,10 +8589,59 @@ namespace matrix
 			}
 		}
 
+		// Identity
+
+		void identity()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			double* data1 = this->_data;
+
+			if constexpr (thisTransposed)
+			{
+				size_t matrix1ActualRows = this->actualRows;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						if (i == j)
+						{
+							data1[j * matrix1ActualRows + i] = 1.0;
+						}
+						else
+						{
+							data1[j * matrix1ActualRows + i] = 0.0;
+						}
+					}
+				}
+			}
+			else
+			{
+				size_t matrix1ActualCols = this->actualCols;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						if (i == j)
+						{
+							data1[i * matrix1ActualCols + j] = 1.0;
+						}
+						else
+						{
+							data1[i * matrix1ActualCols + j] = 0.0;
+						}
+					}
+				}
+			}
+		}
+
 		// +
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double, returnTransposed> operator+(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<double> operator+(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -8510,7 +8654,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -8770,7 +8914,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; finalPosCols; j += 4)
+							for (size_t j = 0; j < finalPosCols; j += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 								__m256d b = _mm256_setr_pd(data2[j * matrix2ActualRows + i],
@@ -8791,7 +8935,7 @@ namespace matrix
 								val1 = _mm_shuffle_pd(val1, val1, 1);
 								_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 							}
-							for (size_t j = finalPosCols; cols; j++)
+							for (size_t j = finalPosCols; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] + data2[j * matrix2ActualRows + i];
 							}
@@ -9233,14 +9377,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> operator+(double num)
+		matrix<double> operator+(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -9611,7 +9755,7 @@ namespace matrix
 		// -
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double, returnTransposed> operator-(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<double> operator-(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -9624,7 +9768,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -9884,7 +10028,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; finalPosCols; j += 4)
+							for (size_t j = 0; j < finalPosCols; j += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 								__m256d b = _mm256_setr_pd(data2[j * matrix2ActualRows + i],
@@ -9905,7 +10049,7 @@ namespace matrix
 								val1 = _mm_shuffle_pd(val1, val1, 1);
 								_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 							}
-							for (size_t j = finalPosCols; cols; j++)
+							for (size_t j = finalPosCols; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] - data2[j * matrix2ActualRows + i];
 							}
@@ -10347,14 +10491,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> operator-(double num)
+		matrix<double> operator-(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -10725,7 +10869,7 @@ namespace matrix
 		// *
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double, returnTransposed> operator*(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<double> operator*(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -10738,7 +10882,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -10998,7 +11142,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; finalPosCols; j += 4)
+							for (size_t j = 0; j < finalPosCols; j += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 								__m256d b = _mm256_setr_pd(data2[j * matrix2ActualRows + i],
@@ -11019,7 +11163,7 @@ namespace matrix
 								val1 = _mm_shuffle_pd(val1, val1, 1);
 								_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 							}
-							for (size_t j = finalPosCols; cols; j++)
+							for (size_t j = finalPosCols; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] * data2[j * matrix2ActualRows + i];
 							}
@@ -11461,14 +11605,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> operator*(double num)
+		matrix<double> operator*(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -11839,7 +11983,7 @@ namespace matrix
 		// /
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double, returnTransposed> operator/(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<double> operator/(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -11852,7 +11996,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -12112,7 +12256,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; finalPosCols; j += 4)
+							for (size_t j = 0; j < finalPosCols; j += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 								__m256d b = _mm256_setr_pd(data2[j * matrix2ActualRows + i],
@@ -12133,7 +12277,7 @@ namespace matrix
 								val1 = _mm_shuffle_pd(val1, val1, 1);
 								_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 							}
-							for (size_t j = finalPosCols; cols; j++)
+							for (size_t j = finalPosCols; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] / data2[j * matrix2ActualRows + i];
 							}
@@ -12575,14 +12719,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> operator/(double num)
+		matrix<double> operator/(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -12953,7 +13097,7 @@ namespace matrix
 		// ==
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t, returnTransposed> operator==(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<uint8_t> operator==(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -12966,7 +13110,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -13170,7 +13314,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] == data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -13298,14 +13442,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t, returnTransposed> operator==(double num)
+		matrix<uint8_t> operator==(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -13473,7 +13617,7 @@ namespace matrix
 		// !=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t, returnTransposed> operator!=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<uint8_t> operator!=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -13486,7 +13630,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -13690,7 +13834,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] != data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -13818,14 +13962,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t, returnTransposed> operator!=(double num)
+		matrix<uint8_t> operator!=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -13993,7 +14137,7 @@ namespace matrix
 		// >
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t, returnTransposed> operator>(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<uint8_t> operator>(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -14006,7 +14150,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -14210,7 +14354,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] > data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -14338,14 +14482,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t, returnTransposed> operator>(double num)
+		matrix<uint8_t> operator>(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -14513,7 +14657,7 @@ namespace matrix
 		// <
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t, returnTransposed> operator<(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<uint8_t> operator<(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -14526,7 +14670,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -14730,7 +14874,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] < data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -14858,14 +15002,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t, returnTransposed> operator<(double num)
+		matrix<uint8_t> operator<(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -15033,7 +15177,7 @@ namespace matrix
 		// >=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t, returnTransposed> operator>=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<uint8_t> operator>=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -15046,7 +15190,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -15250,7 +15394,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] >= data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -15378,14 +15522,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t, returnTransposed> operator>=(double num)
+		matrix<uint8_t> operator>=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -15553,7 +15697,7 @@ namespace matrix
 		// <=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t, returnTransposed> operator<=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<uint8_t> operator<=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -15566,7 +15710,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -15770,7 +15914,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] <= data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -15898,14 +16042,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t, returnTransposed> operator<=(double num)
+		matrix<uint8_t> operator<=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -16073,14 +16217,14 @@ namespace matrix
 		// Functions
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> exp()
+		matrix<double> exp()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -16097,7 +16241,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_exp_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_exp_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -16233,7 +16377,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::exp(data1[i * matrix1ActualCols + j]);
 						}
@@ -16323,7 +16467,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_exp_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_exp_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -16440,14 +16584,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> exp2()
+		matrix<double> exp2()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -16464,7 +16608,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_exp2_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_exp2_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -16600,7 +16744,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::exp2(data1[i * matrix1ActualCols + j]);
 						}
@@ -16690,7 +16834,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_exp2_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_exp2_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -16807,14 +16951,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> log()
+		matrix<double> log()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -16831,7 +16975,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_log_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_log_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -16967,7 +17111,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::log(data1[i * matrix1ActualCols + j]);
 						}
@@ -17057,7 +17201,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_log_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_log_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -17174,14 +17318,14 @@ namespace matrix
 		}
 		
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> log2()
+		matrix<double> log2()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -17198,7 +17342,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_log2_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_log2_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -17334,7 +17478,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::log2(data1[i * matrix1ActualCols + j]);
 						}
@@ -17424,7 +17568,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_log2_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_log2_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -17541,14 +17685,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> log10()
+		matrix<double> log10()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -17565,7 +17709,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_log10_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_log10_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -17701,7 +17845,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::log10(data1[i * matrix1ActualCols + j]);
 						}
@@ -17791,7 +17935,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_log10_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_log10_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -17910,14 +18054,14 @@ namespace matrix
 #define _mm256_abs_pd(a) _mm256_andnot_pd(mask, (a))
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> abs()
+		matrix<double> abs()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -17936,7 +18080,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_abs_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_abs_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -18072,7 +18216,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::fabs(data1[i * matrix1ActualCols + j]);
 						}
@@ -18151,6 +18295,8 @@ namespace matrix
 
 			double* data1 = this->_data;
 
+			__m256d mask = _mm256_set1_pd(-0.0);
+
 			if constexpr (thisTransposed)
 			{
 				if constexpr (thisContiguous)
@@ -18162,7 +18308,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_abs_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_abs_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -18279,14 +18425,14 @@ namespace matrix
 		}
 		
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> cos()
+		matrix<double> cos()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -18303,7 +18449,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_cos_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_cos_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -18439,7 +18585,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::cos(data1[i * matrix1ActualCols + j]);
 						}
@@ -18529,7 +18675,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_cos_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_cos_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -18646,14 +18792,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> tan()
+		matrix<double> tan()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -18670,7 +18816,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_tan_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_tan_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -18806,7 +18952,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::tan(data1[i * matrix1ActualCols + j]);
 						}
@@ -18896,7 +19042,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_tan_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_tan_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -19013,14 +19159,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> acos()
+		matrix<double> acos()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -19037,7 +19183,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_acos_pd(a));
+							_mm256_store_pd(&dataResult[i], _mm256_acos_pd(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -19173,7 +19319,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::acos(data1[i * matrix1ActualCols + j]);
 						}
@@ -19263,7 +19409,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_acos_pd(a));
+						_mm256_store_pd(&data1[i], _mm256_acos_pd(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -19380,14 +19526,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> round()
+		matrix<double> round()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -19404,7 +19550,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_round_pd(a, _MM_FROUND_TO_NEAREST_INT));
+							_mm256_store_pd(&dataResult[i], _mm256_round_pd(a, _MM_FROUND_TO_NEAREST_INT));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -19540,7 +19686,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::round(data1[i * matrix1ActualCols + j]);
 						}
@@ -19630,7 +19776,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_round_pd(a, _MM_FROUND_TO_NEAREST_INT));
+						_mm256_store_pd(&data1[i], _mm256_round_pd(a, _MM_FROUND_TO_NEAREST_INT));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -19747,14 +19893,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> floor()
+		matrix<double> floor()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -19771,7 +19917,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_round_pd(a, _MM_FROUND_FLOOR));
+							_mm256_store_pd(&dataResult[i], _mm256_round_pd(a, _MM_FROUND_FLOOR));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -19907,7 +20053,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::floor(data1[i * matrix1ActualCols + j]);
 						}
@@ -19997,7 +20143,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_round_pd(a, _MM_FROUND_FLOOR));
+						_mm256_store_pd(&data1[i], _mm256_round_pd(a, _MM_FROUND_FLOOR));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -20116,14 +20262,14 @@ namespace matrix
 		// pow
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> pow(double num)
+		matrix<double> pow(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -20354,7 +20500,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double, returnTransposed> pow(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<double> pow(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -20367,7 +20513,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -20627,7 +20773,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; finalPosCols; j += 4)
+							for (size_t j = 0; j < finalPosCols; j += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 								__m256d b = _mm256_setr_pd(data2[j * matrix2ActualRows + i],
@@ -20648,7 +20794,7 @@ namespace matrix
 								val1 = _mm_shuffle_pd(val1, val1, 1);
 								_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 							}
-							for (size_t j = finalPosCols; cols; j++)
+							for (size_t j = finalPosCols; j < cols; j++)
 							{
 								dataResult[j * rows + i] = std::pow(data1[i * matrix1ActualCols + j], data2[j * matrix2ActualRows + i]);
 							}
@@ -21230,14 +21376,14 @@ namespace matrix
 		// root
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> root(double num)
+		matrix<double> root(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -21470,7 +21616,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double, returnTransposed> root(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		matrix<double> root(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -21483,7 +21629,7 @@ namespace matrix
 			double* data1 = this->_data;
 			double* data2 = other._data;
 
-			matrix<double, returnTransposed, true> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -21745,7 +21891,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; finalPosCols; j += 4)
+							for (size_t j = 0; j < finalPosCols; j += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 								__m256d b = _mm256_setr_pd(data2[j * matrix2ActualRows + i],
@@ -21766,7 +21912,7 @@ namespace matrix
 								val1 = _mm_shuffle_pd(val1, val1, 1);
 								_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 							}
-							for (size_t j = finalPosCols; cols; j++)
+							for (size_t j = finalPosCols; j < cols; j++)
 							{
 								dataResult[j * rows + i] = std::pow(data1[i * matrix1ActualCols + j], 1.0 / data2[j * matrix2ActualRows + i]);
 							}
@@ -22962,7 +23108,7 @@ namespace matrix
 						__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
 
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 					__m256d variance = _mm256_div_pd(_mm256_sub_pd(_sumSquare, _mm256_div_pd(_mm256_mul_pd(_sum, _sum), _cols)), _mm256_sub_pd(_cols, _ddof));
 					_mm256_store_pd(&dataResult[i], _mm256_sqrt_pd(variance));
@@ -22978,7 +23124,7 @@ namespace matrix
 							data1[(j + 2) * matrix1ActualRows + i],
 							data1[(j + 3) * matrix1ActualRows + i]);
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 
 					__m128d vlow = _mm256_castpd256_pd128(_sum);
@@ -22988,14 +23134,14 @@ namespace matrix
 					__m128d high64 = _mm_unpackhi_pd(vlow, vlow);
 					double sum = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 					//--
-					__m128d vlow1 = _mm256_castpd256_pd128(_sumSquare);
+					vlow = _mm256_castpd256_pd128(_sumSquare);
 					vhigh = _mm256_extractf128_pd(_sumSquare, 1);
-					vlow1 = _mm_add_pd(vlow1, vhigh);
+					vlow = _mm_add_pd(vlow, vhigh);
 
-					high64 = _mm_unpackhi_pd(vlow1, vlow1);
-					double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow1, high64));
+					high64 = _mm_unpackhi_pd(vlow, vlow);
+					double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 
-					for (size_t j = 0; j < cols; j++)
+					for (size_t j = finalPosCols; j < cols; j++)
 					{
 						double data = data1[j * matrix1ActualRows + i];
 						sum += data;
@@ -23025,7 +23171,8 @@ namespace matrix
 							data1[(i + 3) * matrix1ActualCols + j]);
 
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
+						
 					}
 					__m256d variance = _mm256_div_pd(_mm256_sub_pd(_sumSquare, _mm256_div_pd(_mm256_mul_pd(_sum, _sum), _cols)), _mm256_sub_pd(_cols, _ddof));
 					_mm256_store_pd(&dataResult[i], _mm256_sqrt_pd(variance));
@@ -23038,7 +23185,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 
 					__m128d vlow = _mm256_castpd256_pd128(_sum);
@@ -23048,14 +23195,14 @@ namespace matrix
 					__m128d high64 = _mm_unpackhi_pd(vlow, vlow);
 					double sum = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 					//--
-					__m128d vlow1 = _mm256_castpd256_pd128(_sumSquare);
+					vlow = _mm256_castpd256_pd128(_sumSquare);
 					vhigh = _mm256_extractf128_pd(_sumSquare, 1);
-					vlow1 = _mm_add_pd(vlow1, vhigh);
+					vlow = _mm_add_pd(vlow, vhigh);
 
-					high64 = _mm_unpackhi_pd(vlow1, vlow1);
-					double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow1, high64));
+					high64 = _mm_unpackhi_pd(vlow, vlow);
+					double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 
-					for (size_t j = 0; j < cols; j++)
+					for (size_t j = finalPosCols; j < cols; j++)
 					{
 						double data = data1[i * matrix1ActualCols + j];
 						sum += data;
@@ -23104,7 +23251,7 @@ namespace matrix
 							data1[(j + 3) * matrix1ActualRows + i]);
 
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 					__m256d variance = _mm256_div_pd(_mm256_sub_pd(_sumSquare, _mm256_div_pd(_mm256_mul_pd(_sum, _sum), _rows)), _mm256_sub_pd(_rows, _ddof));
 					_mm256_store_pd(&dataResult[j], _mm256_sqrt_pd(variance));
@@ -23119,7 +23266,7 @@ namespace matrix
 						__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
 
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 					__m128d vlow = _mm256_castpd256_pd128(_sum);
 					__m128d vhigh = _mm256_extractf128_pd(_sum, 1);
@@ -23128,12 +23275,12 @@ namespace matrix
 					__m128d high64 = _mm_unpackhi_pd(vlow, vlow);
 					double sum = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 					//--
-					__m128d vlow1 = _mm256_castpd256_pd128(_sumSquare);
+					vlow = _mm256_castpd256_pd128(_sumSquare);
 					vhigh = _mm256_extractf128_pd(_sumSquare, 1);
-					vlow1 = _mm_add_pd(vlow1, vhigh);
+					vlow = _mm_add_pd(vlow, vhigh);
 
-					high64 = _mm_unpackhi_pd(vlow1, vlow1);
-					double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow1, high64));
+					high64 = _mm_unpackhi_pd(vlow, vlow);
+					double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 					for (size_t i = finalPosRows; i < rows; i++)
 					{
 						double data = data1[j * matrix1ActualRows + i];
@@ -23161,7 +23308,7 @@ namespace matrix
 						__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 					__m256d variance = _mm256_div_pd(_mm256_sub_pd(_sumSquare, _mm256_div_pd(_mm256_mul_pd(_sum, _sum), _rows)), _mm256_sub_pd(_rows, _ddof));
 					_mm256_store_pd(&dataResult[j], _mm256_sqrt_pd(variance));
@@ -23179,7 +23326,7 @@ namespace matrix
 							data1[(i + 3) * matrix1ActualCols + j]);
 
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 					__m128d vlow = _mm256_castpd256_pd128(_sum);
 					__m128d vhigh = _mm256_extractf128_pd(_sum, 1);
@@ -23188,12 +23335,12 @@ namespace matrix
 					__m128d high64 = _mm_unpackhi_pd(vlow, vlow);
 					double sum = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 					//--
-					__m128d vlow1 = _mm256_castpd256_pd128(_sumSquare);
+					vlow = _mm256_castpd256_pd128(_sumSquare);
 					vhigh = _mm256_extractf128_pd(_sumSquare, 1);
-					vlow1 = _mm_add_pd(vlow1, vhigh);
+					vlow = _mm_add_pd(vlow, vhigh);
 
-					high64 = _mm_unpackhi_pd(vlow1, vlow1);
-					double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow1, high64));
+					high64 = _mm_unpackhi_pd(vlow, vlow);
+					double sumSquare = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 
 					for (size_t i = finalPosRows; i < rows; i++)
 					{
@@ -23236,7 +23383,7 @@ namespace matrix
 					__m256d a = _mm256_load_pd(&data1[i]);
 
 					_sum = _mm256_add_pd(_sum, a);
-					_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+					_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 				}
 				for (size_t i = finalPosSize; i < size; i++)
 				{
@@ -23259,7 +23406,7 @@ namespace matrix
 						__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
 
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 				}
 				for (size_t i = finalPosRows; i < rows; i++)
@@ -23272,7 +23419,7 @@ namespace matrix
 							data1[(j + 3) * matrix1ActualRows + i]);
 
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 					for (size_t j = finalPosCols; j < cols; j++)
 					{
@@ -23295,7 +23442,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 				}
 				for (size_t j = finalPosCols; j < cols; j++)
@@ -23307,7 +23454,7 @@ namespace matrix
 							data1[(i + 2) * matrix1ActualCols + j],
 							data1[(i + 3) * matrix1ActualCols + j]);
 						_sum = _mm256_add_pd(_sum, a);
-						_sumSquare = _mm256_add_pd(_sumSquare, _mm256_mul_pd(a, a));
+						_sumSquare = _mm256_fmadd_pd(a, a, _sumSquare);
 					}
 					for (size_t i = finalPosRows; i < rows; i++)
 					{
@@ -23325,12 +23472,12 @@ namespace matrix
 			__m128d high64 = _mm_unpackhi_pd(vlow, vlow);
 			sum += _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 			//--
-			__m128d vlow1 = _mm256_castpd256_pd128(_sumSquare);
+			vlow = _mm256_castpd256_pd128(_sumSquare);
 			vhigh = _mm256_extractf128_pd(_sumSquare, 1);
-			vlow = _mm_add_pd(vlow1, vhigh);
+			vlow = _mm_add_pd(vlow, vhigh);
 
-			high64 = _mm_unpackhi_pd(vlow1, vlow1);
-			sumSquare += _mm_cvtsd_f64(_mm_add_sd(vlow1, high64));
+			high64 = _mm_unpackhi_pd(vlow, vlow);
+			sumSquare += _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
 
 			if (mean != nullptr) *mean = sum / size_d;
 
@@ -23670,18 +23817,18 @@ namespace matrix
 				{
 					__m256d a = _mm256_load_pd(&data1[i]);
 
-					int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _min, _CMP_LT_OQ));
+					__m256d mask = _mm256_cmp_pd(a, _min, _CMP_LT_OQ);
 
-					min_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
+					min_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
 
-					_min = _mm256_blend_pd(_min, a, mask);
+					_min = _mm256_blendv_pd(_min, a, mask);
 
 					indices = _mm256_add_epi64(indices, four);
 				}
 				for (size_t i = finalPosSize; i < size; i++)
 				{
 					double data = data1[i];
-					if (min < data)
+					if (data < min)
 					{
 						min = data;
 						min_index = i;
@@ -23692,7 +23839,7 @@ namespace matrix
 				size_t indices_arr[4];
 
 				_mm256_store_pd(mins_arr, _min);
-				_mm256_storeu_epi64(indices_arr, indices);
+				_mm256_storeu_epi64(indices_arr, min_indices);
 
 				for (size_t i = 0; i < 4; i++)
 				{
@@ -23746,7 +23893,7 @@ namespace matrix
 
 						_min = _mm256_blend_pd(_min, a, mask);
 
-						_j = _mm256_add_epi64(_j, one)
+						_j = _mm256_add_epi64(_j, one);
 					}
 					_i = _mm256_add_epi64(_i, four);
 				}
@@ -23885,11 +24032,11 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _min, _CMP_LT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _min, _CMP_LT_OQ);
 
-						min_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
+						min_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
 
-						_min = _mm256_blend_pd(_min, a, mask);
+						_min = _mm256_blendv_pd(_min, a, mask);
 
 						indices = _mm256_add_epi64(indices, one);
 					}
@@ -23931,11 +24078,11 @@ namespace matrix
 							data1[(i + 2) * matrix1ActualCols + j], 
 							data1[(i + 3) * matrix1ActualCols + j]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _min, _CMP_LT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _min, _CMP_LT_OQ);
 
-						min_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
+						min_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
 
-						_min = _mm256_blend_pd(_min, a, mask);
+						_min = _mm256_blendv_pd(_min, a, mask);
 
 						indices = _mm256_add_epi64(indices, one);
 					}
@@ -23991,11 +24138,11 @@ namespace matrix
 							data1[(j + 2) * matrix1ActualRows + i], 
 							data1[(j + 3) * matrix1ActualRows + i]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _min, _CMP_LT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _min, _CMP_LT_OQ);
 
-						min_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
+						min_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
 
-						_min = _mm256_blend_pd(_min, a, mask);
+						_min = _mm256_blendv_pd(_min, a, mask);
 
 						indices = _mm256_add_epi64(indices, one);
 					}
@@ -24034,11 +24181,11 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _min, _CMP_LT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _min, _CMP_LT_OQ);
 
-						min_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
+						min_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(min_indices), _mm256_castsi256_pd(indices), mask));
 
-						_min = _mm256_blend_pd(_min, a, mask);
+						_min = _mm256_blendv_pd(_min, a, mask);
 
 						indices = _mm256_add_epi64(indices, one);
 					}
@@ -24362,7 +24509,7 @@ namespace matrix
 			low = _mm_max_pd(low, high);
 			double temp_max_d = _mm_cvtsd_f64(low);
 
-			if (temp_max_d < max) max = temp_max_d;
+			if (temp_max_d > max) max = temp_max_d;
 
 			return max;
 		}
@@ -24394,18 +24541,18 @@ namespace matrix
 				{
 					__m256d a = _mm256_load_pd(&data1[i]);
 
-					int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _max, _CMP_GT_OQ));
+					__m256d mask = _mm256_cmp_pd(a, _max, _CMP_GT_OQ);
 
-					max_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
+					max_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
 
-					_max = _mm256_blend_pd(_max, a, mask);
+					_max = _mm256_blendv_pd(_max, a, mask);
 
 					indices = _mm256_add_epi64(indices, four);
 				}
 				for (size_t i = finalPosSize; i < size; i++)
 				{
 					double data = data1[i];
-					if (max < data)
+					if (data > max)
 					{
 						max = data;
 						max_index = i;
@@ -24416,7 +24563,7 @@ namespace matrix
 				size_t indices_arr[4];
 
 				_mm256_store_pd(maxs_arr, _max);
-				_mm256_storeu_epi64(indices_arr, indices);
+				_mm256_storeu_epi64(indices_arr, max_indices);
 
 				for (size_t i = 0; i < 4; i++)
 				{
@@ -24462,15 +24609,15 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _max, _CMP_GT_OQ));
+						int mask = _mm256_cmp_pd(a, _max, _CMP_GT_OQ);
 
-						_i_max = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(_i_max), _mm256_castsi256_pd(_i), mask));
+						_i_max = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(_i_max), _mm256_castsi256_pd(_i), mask));
 
-						_j_max = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(_j_max), _mm256_castsi256_pd(_j), mask));
+						_j_max = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(_j_max), _mm256_castsi256_pd(_j), mask));
 
-						_max = _mm256_blend_pd(_max, a, mask);
+						_max = _mm256_blendv_pd(_max, a, mask);
 
-						_j = _mm256_add_epi64(_j, one)
+						_j = _mm256_add_epi64(_j, one);
 					}
 					_i = _mm256_add_epi64(_i, four);
 				}
@@ -24532,13 +24679,13 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _max, _CMP_GT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _max, _CMP_GT_OQ);
 
-						_i_max = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(_i_max), _mm256_castsi256_pd(_i), mask));
+						_i_max = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(_i_max), _mm256_castsi256_pd(_i), mask));
 
-						_j_max = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(_j_max), _mm256_castsi256_pd(_j), mask));
+						_j_max = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(_j_max), _mm256_castsi256_pd(_j), mask));
 
-						_max = _mm256_blend_pd(_max, a, mask);
+						_max = _mm256_blendv_pd(_max, a, mask);
 
 						_i = _mm256_add_epi64(_i, one);
 					}
@@ -24609,11 +24756,11 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _max, _CMP_GT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _max, _CMP_GT_OQ);
 
-						max_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
+						max_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
 
-						_max = _mm256_blend_pd(_max, a, mask);
+						_max = _mm256_blendv_pd(_max, a, mask);
 
 						indices = _mm256_add_epi64(indices, one);
 					}
@@ -24655,11 +24802,11 @@ namespace matrix
 							data1[(i + 2) * matrix1ActualCols + j],
 							data1[(i + 3) * matrix1ActualCols + j]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _max, _CMP_GT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _max, _CMP_GT_OQ);
 
-						max_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
+						max_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
 
-						_max = _mm256_blend_pd(_max, a, mask);
+						_max = _mm256_blendv_pd(_max, a, mask);
 
 						indices = _mm256_add_epi64(indices, one);
 					}
@@ -24715,11 +24862,11 @@ namespace matrix
 							data1[(j + 2) * matrix1ActualRows + i],
 							data1[(j + 3) * matrix1ActualRows + i]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _max, _CMP_GT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _max, _CMP_GT_OQ);
 
-						max_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
+						max_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
 
-						_max = _mm256_blend_pd(_max, a, mask);
+						_max = _mm256_blendv_pd(_max, a, mask);
 
 						indices = _mm256_add_epi64(indices, one);
 					}
@@ -24758,11 +24905,11 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
 
-						int mask = _mm256_movemask_pd(_mm256_cmp_pd(a, _max, _CMP_GT_OQ));
+						__m256d mask = _mm256_cmp_pd(a, _max, _CMP_GT_OQ);
 
-						max_indices = _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
+						max_indices = _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(max_indices), _mm256_castsi256_pd(indices), mask));
 
-						_max = _mm256_blend_pd(_max, a, mask);
+						_max = _mm256_blendv_pd(_max, a, mask);
 
 						indices = _mm256_add_epi64(indices, one);
 					}
@@ -24791,21 +24938,21 @@ namespace matrix
 
 		template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
 			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-		matrix<double, returnTransposed> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
+		matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
 
 		// Activation functions
 
 		// ReLU
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> relu()
+		matrix<double> relu()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -24824,7 +24971,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_max_pd(zero, a));
+							_mm256_store_pd(&dataResult[i], _mm256_max_pd(zero, a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -24960,7 +25107,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::max(0.0, data1[i * matrix1ActualCols + j]);
 						}
@@ -25052,7 +25199,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_max_pd(zero, a));
+						_mm256_store_pd(&data1[i], _mm256_max_pd(zero, a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -25171,14 +25318,14 @@ namespace matrix
 		// LReLU
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> lrelu()
+		matrix<double> lrelu()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -25197,7 +25344,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_max_pd(_num, a));
+							_mm256_store_pd(&dataResult[i], _mm256_max_pd(_num, a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -25333,7 +25480,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::max(0.01, data1[i * matrix1ActualCols + j]);
 						}
@@ -25425,7 +25572,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_max_pd(_num, a));
+						_mm256_store_pd(&data1[i], _mm256_max_pd(_num, a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -25544,14 +25691,14 @@ namespace matrix
 		// Sigmoid
 
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> sigmoid()
+		matrix<double> sigmoid()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -25572,7 +25719,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_div_pd(one, _mm256_add_pd(_mm256_exp_pd(_mm256_xor_pd(a, mask)), one)));
+							_mm256_store_pd(&dataResult[i], _mm256_div_pd(one, _mm256_add_pd(_mm256_exp_pd(_mm256_xor_pd(a, mask)), one)));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -25708,7 +25855,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = 1.0 / (1.0 + std::exp(-data1[i * matrix1ActualCols + j]));
 						}
@@ -25802,7 +25949,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_div_pd(one, _mm256_add_pd(_mm256_exp_pd(_mm256_xor_pd(a, mask)), one)));
+						_mm256_store_pd(&data1[i], _mm256_div_pd(one, _mm256_add_pd(_mm256_exp_pd(_mm256_xor_pd(a, mask)), one)));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -25921,14 +26068,14 @@ namespace matrix
 		// Softplus
 		
 		template<bool returnTransposed = false>
-		matrix<double, returnTransposed> softplus()
+		matrix<double> softplus()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			double* data1 = this->_data;
 
-			matrix<double, returnTransposed> result(rows, cols);
+			matrix<double> result(rows, cols);
 
 			double* dataResult = result._data;
 
@@ -25947,7 +26094,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[i]);
 
-							_mm256_store_pd(&dataResult[i]; _mm256_log_pd(_mm256_add_pd(one, _mm256_exp_pd(a))));
+							_mm256_store_pd(&dataResult[i], _mm256_log_pd(_mm256_add_pd(one, _mm256_exp_pd(a))));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -26023,7 +26170,7 @@ namespace matrix
 						{
 							__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
 
-							__m256d sigmoid = _mm256_div_pd(one, _mm256_add_pd(_mm256_exp_pd(_mm256_xor_pd(a, mask)), one));
+							__m256d sigmoid = _mm256_log_pd(_mm256_add_pd(one, _mm256_exp_pd(a)));
 
 							__m128d val1 = _mm256_extractf128_pd(sigmoid, 1);
 							__m128d val2 = _mm256_castpd256_pd128(sigmoid);
@@ -26083,7 +26230,7 @@ namespace matrix
 							val1 = _mm_shuffle_pd(val1, val1, 1);
 							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
 						}
-						for (size_t j = finalPosCols; i < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							dataResult[j * rows + i] = std::log(1.0 + std::exp(data1[i * matrix1ActualCols + j]));
 						}
@@ -26175,7 +26322,7 @@ namespace matrix
 					{
 						__m256d a = _mm256_load_pd(&data1[i]);
 
-						_mm256_store_pd(&data1[i]; _mm256_log_pd(_mm256_add_pd(one, _mm256_exp_pd(a))));
+						_mm256_store_pd(&data1[i], _mm256_log_pd(_mm256_add_pd(one, _mm256_exp_pd(a))));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -26298,14 +26445,15 @@ namespace matrix
 		size_t finalPosRows, finalPosCols, finalPosSize;
 	};
 
-	template <bool thisTransposed, bool thisContiguous, bool otherCallDestructor>
-	class matrix<uint8_t, thisTransposed, thisContiguous, otherCallDestructor>
+	template <bool thisTransposed, bool thisContiguous, bool callDestructor>
+	class matrix<uint8_t, thisTransposed, thisContiguous, callDestructor>
 	{
 	public:
 		inline matrix(size_t rows, size_t cols) : 
 			_data(new uint8_t[rows * cols]), 
 			_rows(rows), 
 			_cols(cols), 
+			_size(rows* cols),
 			actualRows(rows), 
 			actualCols(cols), 
 			finalPosSize((_size / 32) * 32),
@@ -26319,6 +26467,7 @@ namespace matrix
 			_data(data),
 			_rows(rows),
 			_cols(cols),
+			_size(rows* cols),
 			actualRows(actualRows),
 			actualCols(actualCols),
 			finalPosSize((_size / 32) * 32),
@@ -26328,12 +26477,52 @@ namespace matrix
 			finalPosActualRows256((rows / 256) * 256),
 			finalPosActualCols256((cols / 256) * 256) {}
 
-		friend class matrix<double, false, true>;
-		friend class matrix<double, true, false>;
-		friend class matrix<double, true, true>;
-		friend class matrix<double, false, false>;
+		// Friend classes
 
-		friend class vector<uint64_t>;
+		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		friend class matrix;
+
+		template <typename T, bool otherCallDestructor>
+		friend class vector;
+
+		// Friend functions
+
+		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
+		friend std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+		{
+			size_t rows = matrix._rows;
+			size_t cols = matrix._cols;
+
+			uint8_t* data1 = matrix._data;
+
+			if constexpr (otherTransposed)
+			{
+				size_t actualRows = matrix.actualRows;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						std::cout << (data1[j * actualRows + i] ? 1 : 0) << " ";
+					}
+					std::cout << std::endl;
+				}
+			}
+			else
+			{
+				size_t actualCols = matrix.actualCols;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						std::cout << (data1[i * actualCols + j] ? 1 : 0) << " ";
+					}
+					std::cout << std::endl;
+				}
+			}
+			return os;
+		}
 
 		~matrix() { if constexpr (callDestructor) delete[] this->_data; }
 
@@ -26436,43 +26625,15 @@ namespace matrix
 			}
 		}
 
-		template<bool otherTransposed, bool otherContiguous>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous>& matrix)
-		{
-			if constexpr (otherTransposed)
-			{
-				for (size_t i = 0; i < matrix._rows; i++)
-				{
-					for (size_t j = 0; j < matrix._cols; j++)
-					{
-						std::cout << this->[j * matrix.actualRows + i] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			else
-			{
-				for (size_t i = 0; i < matrix._rows; i++)
-				{
-					for (size_t j = 0; j < matrix._cols; j++)
-					{
-						std::cout << this->[i * matrix.actualCols + j] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			return os;
-		}
-
 		inline uint8_t& operator()(size_t row, size_t col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return this->_data[col * this->actualRows + row]
+				return this->_data[col * this->actualRows + row];
 			}
 			else
 			{
-				return this->_data[row * this->actualCols + col]
+				return this->_data[row * this->actualCols + col];
 			}
 		}
 
@@ -26480,16 +26641,16 @@ namespace matrix
 		{
 			if constexpr (thisTransposed)
 			{
-				return this->_data[col * this->actualRows + row]
+				return this->_data[col * this->actualRows + row];
 			}
 			else
 			{
-				return this->_data[row * this->actualCols + col]
+				return this->_data[row * this->actualCols + col];
 			}
 		}
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t, returnTransposed, true> operator&&(matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator&&(matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -26502,7 +26663,7 @@ namespace matrix
 			uint8_t* data1 = this->_data;
 			uint8_t* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -26653,7 +26814,7 @@ namespace matrix
 							size_t size = this->_size;
 
 							size_t finalPosSize = this->finalPosSize;
-
+							
 							for (size_t i = 0; i < finalPosSize; i += 32)
 							{
 								__m256i a = _mm256_loadu_epi8(&data1[i]);
@@ -26664,6 +26825,7 @@ namespace matrix
 							for (size_t i = finalPosSize; i < size; i++)
 							{
 								dataResult[i] = data1[i] & data2[i];
+								
 							}
 						}
 						else
@@ -26698,7 +26860,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t, returnTransposed, true> operator||(matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator||(matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -26711,7 +26873,7 @@ namespace matrix
 			uint8_t* data1 = this->_data;
 			uint8_t* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -26907,18 +27069,18 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t, returnTransposed, true> operator!()
+		inline matrix<uint8_t> operator!()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			uint8_t* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
-			__m256d b = _mm256_set1_epi64x(-1);
+			__m256i b = _mm256_set1_epi64x(-1);
 
 			if constexpr (thisTransposed)
 			{
@@ -26931,7 +27093,7 @@ namespace matrix
 
 						for (size_t i = 0; i < finalPosSize; i += 32)
 						{
-							__m256d a = _mm256_loadu_epi8(&data1[i]);
+							__m256i a = _mm256_loadu_epi8(&data1[i]);
 							_mm256_storeu_epi8(&dataResult[i], _mm256_andnot_si256(a, b));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
@@ -26949,7 +27111,7 @@ namespace matrix
 						{
 							for (size_t j = 0; j < cols; j++)
 							{
-								__m256d a = _mm256_loadu_epi8(&data1[j * matrix1ActualRows + i]);
+								__m256i a = _mm256_loadu_epi8(&data1[j * matrix1ActualRows + i]);
 								_mm256_storeu_epi8(&dataResult[j * rows + i], _mm256_andnot_si256(a, b));
 							}
 						}
@@ -26998,7 +27160,7 @@ namespace matrix
 
 						for (size_t i = 0; i < finalPosSize; i += 32)
 						{
-							__m256d a = _mm256_loadu_epi8(&data1[i]);
+							__m256i a = _mm256_loadu_epi8(&data1[i]);
 							_mm256_storeu_epi8(&dataResult[i], _mm256_andnot_si256(a, b));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
@@ -27144,14 +27306,14 @@ namespace matrix
 				{
 					for (size_t i = 0; i < finalPosActualRows256; i += 256)
 					{
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 32])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 64])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 96])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 128])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 160])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 192])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 224])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 32])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 64])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 96])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 128])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 160])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 192])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 224])));
 					}
 					for (size_t i = finalPosActualRows256; i < rows; i++)
 					{
@@ -27171,14 +27333,14 @@ namespace matrix
 				{
 					for (size_t j = 0; j < finalPosActualCols256; j += 256)
 					{
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 32])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 64])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 96])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 128])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 160])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 192])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 224])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 32])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 64])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 96])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 128])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 160])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 192])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 224])));
 					}
 					for (size_t j = finalPosActualCols256; j < cols; j++)
 					{
@@ -27186,6 +27348,7 @@ namespace matrix
 					}
 				}
 			}
+			return count;
 		}
 
 		inline vector<uint64_t> count_colwise()
@@ -27212,14 +27375,14 @@ namespace matrix
 					size_t count = 0;
 					for (size_t i = 0; i < finalPosActualRows256; i += 256)
 					{
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 32])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 64])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 96])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 128])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 160])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 192])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[j * matrix1ActualRows + i + 224])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 32])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 64])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 96])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 128])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 160])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 192])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 224])));
 					}
 					for (size_t i = finalPosActualRows256; i < rows; i++)
 					{
@@ -27284,14 +27447,14 @@ namespace matrix
 					size_t count = 0;
 					for (size_t j = 0; j < finalPosActualCols256; j += 256)
 					{
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 32])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 64])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 96])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 128])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 160])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 192])));
-						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(data1[i * matrix1ActualCols + j + 224])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 32])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 64])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 96])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 128])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 160])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 192])));
+						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 224])));
 					}
 					for (size_t j = finalPosActualCols256; j < cols; j++)
 					{
@@ -27324,7 +27487,6 @@ namespace matrix
 			_size(rows* cols),
 			actualRows(rows),
 			actualCols(cols),
-			contiguous(true),
 			finalPosRows((_rows / 8) * 8),
 			finalPosCols((_cols / 8) * 8),
 			finalPosSize((_size / 8) * 8) {}
@@ -27336,28 +27498,62 @@ namespace matrix
 			_size(rows* cols),
 			actualRows(actualRows),
 			actualCols(actualCols),
-			contiguous(contiguous),
 			finalPosRows((_rows / 8) * 8),
 			finalPosCols((_cols / 8) * 8),
 			finalPosSize((_size / 8) * 8) {}
 
 		~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
 
-		//Friend classes
+		// Friend classes
 
-		friend class matrix<uint8_t>;
+		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		friend class matrix;
 
-		friend class vector<float>;
+		template <typename T, bool otherCallDestructor>
+		friend class vector;
 
-		friend class vector<uint64_t>;
-
-		friend vector<float> dot(matrix<float>&, vector<float>&);
-
-		friend inline vector<float> dot(matrix<float>&, vector<float>&);
+		// Friend functions
 
 		template<bool returnTransposed, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
 			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-		friend inline matrix<float, returnTransposed> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
+		friend inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
+
+		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
+		friend std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+		{
+			size_t rows = matrix._rows;
+			size_t cols = matrix._cols;
+
+			float* data1 = matrix._data;
+
+			if constexpr (otherTransposed)
+			{
+				size_t actualRows = matrix.actualRows;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						std::cout << data1[j * actualRows + i] << " ";
+					}
+					std::cout << std::endl;
+				}
+			}
+			else
+			{
+				size_t actualCols = matrix.actualCols;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						std::cout << data1[i * actualCols + j] << " ";
+					}
+					std::cout << std::endl;
+				}
+			}
+			return os;
+		}
 
 		//----------------
 
@@ -27460,34 +27656,6 @@ namespace matrix
 			}
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
-		{
-			if constexpr (otherTransposed)
-			{
-				for (size_t i = 0; i < matrix._rows; i++)
-				{
-					for (size_t j = 0; j < matrix._cols; j++)
-					{
-						std::cout << this->[j * matrix.actualRows + i] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			else
-			{
-				for (size_t i = 0; i < matrix._rows; i++)
-				{
-					for (size_t j = 0; j < matrix._cols; j++)
-					{
-						std::cout << this->[i * matrix.actualCols + j] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			return os;
-		}
-
 		inline float& operator()(size_t row, size_t col)
 		{
 			if constexpr (thisTransposed)
@@ -27512,6 +27680,55 @@ namespace matrix
 			}
 		}
 
+		// Indentity
+
+		void identity()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			float* data1 = this->_data;
+
+			if constexpr (thisTransposed)
+			{
+				size_t matrix1ActualRows = this->actualRows;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						if (i == j)
+						{
+							data1[j * matrix1ActualRows + i] = 1.0f;
+						}
+						else
+						{
+							data1[j * matrix1ActualRows + i] = 0.0f;
+						}
+					}
+				}
+			}
+			else
+			{
+				size_t matrix1ActualCols = this->actualCols;
+
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < rows; j++)
+					{
+						if (i == j)
+						{
+							data1[i * matrix1ActualCols + j] = 1.0f;
+						}
+						else
+						{
+							data1[i * matrix1ActualCols + j] = 0.0f;
+						}
+					}
+				}
+			}
+		}
+
 		// Set constant
 
 		inline void set_const(float num)
@@ -27526,7 +27743,7 @@ namespace matrix
 				size_t matrix1ActualRows = this->actualRows;
 				for (size_t i = 0; i < rows; i++)
 				{
-					for (size_t j = 0; i < cols; j++)
+					for (size_t j = 0; j < cols; j++)
 					{
 						data1[j * matrix1ActualRows + i] = num;
 					}
@@ -27537,7 +27754,7 @@ namespace matrix
 				size_t matrix1ActualCols = this->actualCols;
 				for (size_t i = 0; i < rows; i++)
 				{
-					for (size_t j = 0; i < cols; j++)
+					for (size_t j = 0; j < cols; j++)
 					{
 						data1[i * matrix1ActualCols + j] = num;
 					}
@@ -27582,7 +27799,9 @@ namespace matrix
 
 					// uint32 to float
 
-					_mm256_store_ps(&data1[i], _mm256_div_ps(_mm256_cvtepi32_ps(__seeds__), divisor));
+					uint32_to_float(__seeds__);
+
+					_mm256_store_ps(&data1[i], _mm256_div_ps(uint32ToFloat, divisor));
 				}
 				for (size_t i = finalPosSize; i < size; i++)
 				{
@@ -27597,7 +27816,9 @@ namespace matrix
 
 					// uint32 to float
 
-					_mm_store_sd(&data1[i], _mm256_castpd256_pd128(_mm256_div_ps(_mm256_cvtepi32_ps(__seeds__), divisor)));
+					uint32_to_float(__seeds__);
+
+					_mm_store_ss(&data1[i], _mm256_castps256_ps128(_mm256_div_ps(uint32ToFloat, divisor)));
 				}
 			}
 			else if constexpr (thisTransposed)
@@ -27618,7 +27839,9 @@ namespace matrix
 
 						// uint32 to float
 
-						_mm256_store_ps(&data1[j * matrix1ActualRows + i], _mm256_div_ps(_mm256_cvtepi32_ps(__seeds__), divisor));
+						uint32_to_float(__seeds__);
+
+						_mm256_store_ps(&data1[j * matrix1ActualRows + i], _mm256_div_ps(uint32ToFloat, divisor));
 					}
 				}
 				for (size_t i = matrix1FinalPosRows; i < rows; i++)
@@ -27636,7 +27859,9 @@ namespace matrix
 
 						// uint32 to float
 
-						_mm_store_sd(&data1[j * matrix1ActualRows + i], _mm256_castpd256_pd128(_mm256_div_ps(_mm256_cvtepi32_ps(__seeds__), divisor)));
+						uint32_to_float(__seeds__);
+
+						_mm_store_sd(&data1[j * matrix1ActualRows + i], _mm256_castpd256_pd128(_mm256_div_ps(uint32ToFloat, divisor)));
 					}
 				}
 			}
@@ -27657,7 +27882,9 @@ namespace matrix
 
 						// uint32 to float
 
-						_mm256_store_ps(&data1[i * matrix1ActualCols + j], _mm256_div_ps(_mm256_cvtepi32_ps(__seeds__), divisor));
+						uint32_to_float(__seeds__);
+
+						_mm256_store_ps(&data1[i * matrix1ActualCols + j], _mm256_div_ps(uint32ToFloat, divisor));
 					}
 				}
 				for (size_t j = matrix1FinalPosCols; j < cols; j++)
@@ -27675,7 +27902,9 @@ namespace matrix
 
 						// uint32 to float
 
-						_mm_store_sd(&data1[i * matrix1ActualCols + j], _mm256_castpd256_pd128(_mm256_div_ps(_mm256_cvtepi32_ps(__seeds__), divisor)));
+						uint32_to_float(__seeds__);
+
+						_mm_store_sd(&data1[i * matrix1ActualCols + j], _mm256_castpd256_pd128(_mm256_div_ps(uint32ToFloat, divisor)));
 					}
 				}
 			}
@@ -27684,7 +27913,7 @@ namespace matrix
 		// +
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float, returnTransposed> operator+(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<float> operator+(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -27697,7 +27926,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -27869,7 +28098,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] + data2[j * matrix2ActualRows + i];
 							}
@@ -27892,7 +28121,7 @@ namespace matrix
 									data2[(j + 4) * matrix2ActualRows + i], 
 									data2[(j + 5) * matrix2ActualRows + i], 
 									data2[(j + 6) * matrix2ActualRows + i], 
-									data2[(j + 7) * matrix2ActualRows + i];
+									data2[(j + 7) * matrix2ActualRows + i]);
 								_mm256_store_ps(&dataResult[i * cols + j], _mm256_add_ps(a, b));
 							}
 						}
@@ -28156,14 +28385,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> operator+(float num)
+		inline matrix<float> operator+(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -28428,7 +28657,7 @@ namespace matrix
 		// -
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float, returnTransposed> operator-(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<float> operator-(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -28441,7 +28670,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -28613,7 +28842,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] - data2[j * matrix2ActualRows + i];
 							}
@@ -28636,7 +28865,7 @@ namespace matrix
 									data2[(j + 4) * matrix2ActualRows + i],
 									data2[(j + 5) * matrix2ActualRows + i],
 									data2[(j + 6) * matrix2ActualRows + i],
-									data2[(j + 7) * matrix2ActualRows + i];
+									data2[(j + 7) * matrix2ActualRows + i]);
 								_mm256_store_ps(&dataResult[i * cols + j], _mm256_sub_ps(a, b));
 							}
 						}
@@ -28900,14 +29129,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> operator-(float num)
+		inline matrix<float> operator-(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -29172,7 +29401,7 @@ namespace matrix
 		// *
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float, returnTransposed> operator*(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<float> operator*(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -29185,7 +29414,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -29357,7 +29586,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] * data2[j * matrix2ActualRows + i];
 							}
@@ -29380,7 +29609,7 @@ namespace matrix
 									data2[(j + 4) * matrix2ActualRows + i],
 									data2[(j + 5) * matrix2ActualRows + i],
 									data2[(j + 6) * matrix2ActualRows + i],
-									data2[(j + 7) * matrix2ActualRows + i];
+									data2[(j + 7) * matrix2ActualRows + i]);
 								_mm256_store_ps(&dataResult[i * cols + j], _mm256_mul_ps(a, b));
 							}
 						}
@@ -29644,14 +29873,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> operator*(float num)
+		inline matrix<float> operator*(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -29916,7 +30145,7 @@ namespace matrix
 		// /
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float, returnTransposed> operator/(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<float> operator/(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -29929,7 +30158,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -30101,7 +30330,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] / data2[j * matrix2ActualRows + i];
 							}
@@ -30124,7 +30353,7 @@ namespace matrix
 									data2[(j + 4) * matrix2ActualRows + i],
 									data2[(j + 5) * matrix2ActualRows + i],
 									data2[(j + 6) * matrix2ActualRows + i],
-									data2[(j + 7) * matrix2ActualRows + i];
+									data2[(j + 7) * matrix2ActualRows + i]);
 								_mm256_store_ps(&dataResult[i * cols + j], _mm256_div_ps(a, b));
 							}
 						}
@@ -30388,14 +30617,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> operator/(float num)
+		inline matrix<float> operator/(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -30660,7 +30889,7 @@ namespace matrix
 		// ==
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t, returnTransposed> operator==(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator==(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -30673,7 +30902,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -30696,7 +30925,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -30724,7 +30953,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 									__m256 b = _mm256_load_ps(&data2[j * matrix2ActualRows + i]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -30799,7 +31028,7 @@ namespace matrix
 					{
 						for (size_t i = 0; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] == data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -30843,7 +31072,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -30871,7 +31100,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 									__m256 b = _mm256_load_ps(&data2[i * matrix2ActualCols + j]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -30896,14 +31125,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t, returnTransposed> operator==(float num)
+		inline matrix<uint8_t> operator==(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -30925,7 +31154,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -30951,7 +31180,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31009,7 +31238,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31035,7 +31264,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_EQ_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31061,7 +31290,7 @@ namespace matrix
 		// !=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t, returnTransposed> operator!=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator!=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -31074,7 +31303,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -31097,7 +31326,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31125,7 +31354,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 									__m256 b = _mm256_load_ps(&data2[j * matrix2ActualRows + i]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31200,7 +31429,7 @@ namespace matrix
 					{
 						for (size_t i = 0; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] != data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -31244,7 +31473,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31272,7 +31501,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 									__m256 b = _mm256_load_ps(&data2[i * matrix2ActualCols + j]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31297,14 +31526,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t, returnTransposed> operator!=(float num)
+		inline matrix<uint8_t> operator!=(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -31326,7 +31555,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31352,7 +31581,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31410,7 +31639,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31436,7 +31665,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31462,7 +31691,7 @@ namespace matrix
 		// >
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t, returnTransposed> operator>(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator>(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -31475,7 +31704,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -31498,7 +31727,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31526,7 +31755,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 									__m256 b = _mm256_load_ps(&data2[j * matrix2ActualRows + i]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31601,7 +31830,7 @@ namespace matrix
 					{
 						for (size_t i = 0; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] > data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -31645,7 +31874,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31673,7 +31902,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 									__m256 b = _mm256_load_ps(&data2[i * matrix2ActualCols + j]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31698,14 +31927,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t, returnTransposed> operator>(float num)
+		inline matrix<uint8_t> operator>(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -31727,7 +31956,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31753,7 +31982,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31811,7 +32040,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31837,7 +32066,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GT_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31863,7 +32092,7 @@ namespace matrix
 		// <
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t, returnTransposed> operator<(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator<(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -31876,7 +32105,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -31899,7 +32128,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -31927,7 +32156,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 									__m256 b = _mm256_load_ps(&data2[j * matrix2ActualRows + i]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32002,7 +32231,7 @@ namespace matrix
 					{
 						for (size_t i = 0; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] < data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -32046,7 +32275,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32074,7 +32303,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 									__m256 b = _mm256_load_ps(&data2[i * matrix2ActualCols + j]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32099,14 +32328,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t, returnTransposed> operator<(float num)
+		inline matrix<uint8_t> operator<(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -32128,7 +32357,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32154,7 +32383,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32212,7 +32441,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32238,7 +32467,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LT_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32264,7 +32493,7 @@ namespace matrix
 		// >=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t, returnTransposed> operator>=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator>=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -32277,7 +32506,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -32300,7 +32529,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32328,7 +32557,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 									__m256 b = _mm256_load_ps(&data2[j * matrix2ActualRows + i]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32403,7 +32632,7 @@ namespace matrix
 					{
 						for (size_t i = 0; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] >= data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -32447,7 +32676,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32475,7 +32704,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 									__m256 b = _mm256_load_ps(&data2[i * matrix2ActualCols + j]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32500,14 +32729,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t, returnTransposed> operator>=(float num)
+		inline matrix<uint8_t> operator>=(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -32529,7 +32758,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32555,7 +32784,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32613,7 +32842,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32639,7 +32868,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_GE_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32665,7 +32894,7 @@ namespace matrix
 		// <=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t, returnTransposed> operator<=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator<=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -32678,7 +32907,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -32701,7 +32930,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32729,7 +32958,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 									__m256 b = _mm256_load_ps(&data2[j * matrix2ActualRows + i]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32804,7 +33033,7 @@ namespace matrix
 					{
 						for (size_t i = 0; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] <= data2[j * matrix2ActualRows + i] ? True : False;
 							}
@@ -32848,7 +33077,7 @@ namespace matrix
 								__m256 a = _mm256_load_ps(&data1[i]);
 								__m256 b = _mm256_load_ps(&data2[i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32876,7 +33105,7 @@ namespace matrix
 									__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 									__m256 b = _mm256_load_ps(&data2[i * matrix2ActualCols + j]);
 
-									__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
+									__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
 
 									__m256i mask1 = _mm256_packs_epi32(mask, mask);
 									__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32901,14 +33130,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t, returnTransposed> operator<=(float num)
+		inline matrix<uint8_t> operator<=(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<uint8_t, returnTransposed, true> result(rows, cols);
+			matrix<uint8_t> result(rows, cols);
 
 			uint8_t* dataResult = result._data;
 
@@ -32930,7 +33159,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -32956,7 +33185,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -33014,7 +33243,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
 
 							__m256i mask1 = _mm256_packs_epi32(mask, mask);
 							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -33040,7 +33269,7 @@ namespace matrix
 							{
 								__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
 
-								__m256i mask = _mm256_castpd_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
+								__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_LE_OQ));
 
 								__m256i mask1 = _mm256_packs_epi32(mask, mask);
 								__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
@@ -33066,14 +33295,14 @@ namespace matrix
 		// Functions
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> exp()
+		inline matrix<float> exp()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -33090,7 +33319,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_exp_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_exp_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -33250,7 +33479,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_exp_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_exp_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -33327,14 +33556,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> exp2()
+		inline matrix<float> exp2()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -33351,7 +33580,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_exp2_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_exp2_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -33511,7 +33740,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_exp2_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_exp2_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -33588,14 +33817,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> log()
+		inline matrix<float> log()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -33612,7 +33841,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_log_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_log_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -33772,7 +34001,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_log_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_log_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -33849,14 +34078,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> log2()
+		inline matrix<float> log2()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -33873,7 +34102,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_log2_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_log2_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -34033,7 +34262,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_log2_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_log2_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -34110,14 +34339,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> log10()
+		inline matrix<float> log10()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -34134,7 +34363,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_log10_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_log10_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -34294,7 +34523,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_log10_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_log10_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -34373,14 +34602,14 @@ namespace matrix
 #define _mm256_abs_ps(a) _mm256_andnot_ps(mask, (a))
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> abs()
+		inline matrix<float> abs()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -34399,7 +34628,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_abs_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_abs_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -34561,7 +34790,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_abs_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_abs_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -34638,14 +34867,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> cos()
+		inline matrix<float> cos()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -34662,7 +34891,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_cos_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_cos_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -34822,7 +35051,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_cos_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_cos_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -34899,14 +35128,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> tan()
+		inline matrix<float> tan()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -34923,7 +35152,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_tan_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_tan_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -35083,7 +35312,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_tan_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_tan_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -35160,14 +35389,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> acos()
+		inline matrix<float> acos()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -35184,7 +35413,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_acos_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_acos_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -35344,7 +35573,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_acos_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_acos_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -35421,14 +35650,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> round()
+		inline matrix<float> round()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -35445,7 +35674,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_round_ps(a, _MM_FROUND_TO_NEAREST_INT));
+							_mm256_store_ps(&dataResult[i], _mm256_round_ps(a, _MM_FROUND_TO_NEAREST_INT));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -35605,7 +35834,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_round_ps(a, _MM_FROUND_TO_NEAREST_INT));
+						_mm256_store_ps(&data1[i], _mm256_round_ps(a, _MM_FROUND_TO_NEAREST_INT));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -35682,14 +35911,14 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> floor()
+		inline matrix<float> floor()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -35706,7 +35935,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_floor_ps(a));
+							_mm256_store_ps(&dataResult[i], _mm256_floor_ps(a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -35866,7 +36095,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_floor_ps(a));
+						_mm256_store_ps(&data1[i], _mm256_floor_ps(a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -35945,14 +36174,14 @@ namespace matrix
 		// pow
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> pow(float num)
+		inline matrix<float> pow(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -35971,7 +36200,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_pow_ps(a, b));
+							_mm256_store_ps(&dataResult[i], _mm256_pow_ps(a, b));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -36114,7 +36343,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float, returnTransposed> pow(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<float> pow(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -36127,7 +36356,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -36299,7 +36528,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = std::pow(data1[i * matrix1ActualCols + j], data2[j * matrix2ActualRows + i]);
 							}
@@ -36425,7 +36654,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_pow_ps(a, b));
+						_mm256_store_ps(&data1[i], _mm256_pow_ps(a, b));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -36684,14 +36913,14 @@ namespace matrix
 		// root
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> root(float num)
+		inline matrix<float> root(float num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -36712,7 +36941,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_pow_ps(a, b));
+							_mm256_store_ps(&dataResult[i], _mm256_pow_ps(a, b));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -36855,7 +37084,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float, returnTransposed> root(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<float> root(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -36868,7 +37097,7 @@ namespace matrix
 			float* data1 = this->_data;
 			float* data2 = other._data;
 
-			matrix<float, returnTransposed, true> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -37042,7 +37271,7 @@ namespace matrix
 						}
 						for (size_t i = finalPosRows; i < rows; i++)
 						{
-							for (size_t j = 0; cols; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								dataResult[j * rows + i] = std::pow(data1[i * matrix1ActualCols + j], 1.0f / data2[j * matrix2ActualRows + i]);
 							}
@@ -37170,7 +37399,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_pow_ps(a, b));
+						_mm256_store_ps(&data1[i], _mm256_pow_ps(a, b));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -37259,6 +37488,8 @@ namespace matrix
 
 			float* data1 = this->_data;
 			float* data2 = other._data;
+
+			__m256 one = _mm256_set1_ps(1.0f);
 
 			if constexpr (thisTransposed)
 			{
@@ -37746,14 +37977,14 @@ namespace matrix
 			__m128 hi128 = _mm256_extractf128_ps(_sum2, 1);
 			__m128 result128 = _mm_add_ps(lo128, hi128);
 
-			sum += _mm_cvtss_f32(_mm256_castps256_ps128(result128));
+			sum += _mm_cvtss_f32(result128);
 
 			return sum / static_cast<float>(size);
 		}
 
 		// Sum
 
-		inline vector<float> mean_rowwise()
+		inline vector<float> sum_rowwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -38063,7 +38294,7 @@ namespace matrix
 			__m128 hi128 = _mm256_extractf128_ps(_sum2, 1);
 			__m128 result128 = _mm_add_ps(lo128, hi128);
 
-			sum += _mm_cvtss_f32(_mm256_castps256_ps128(result128));
+			sum += _mm_cvtss_f32(result128);
 
 			return sum;
 		}
@@ -38867,9 +39098,9 @@ namespace matrix
 
 			val1 = _mm_min_ps(val1, val2);
 
-			float min = _mm_cvtss_f32(val1);
+			float temp_min_f = _mm_cvtss_f32(val1);
 
-			if (temp_min_d < min) min = temp_min_d;
+			if (temp_min_f < min) min = temp_min_f;
 
 			return min;
 		}
@@ -38912,7 +39143,7 @@ namespace matrix
 				for (size_t i = finalPosSize; i < size; i++)
 				{
 					float data = data1[i];
-					if (min < data)
+					if (data < min)
 					{
 						min = data;
 						min_index = i;
@@ -38977,7 +39208,7 @@ namespace matrix
 
 						_min = _mm_blend_ps(_min, a, mask);
 
-						_j = _mm256_add_epi64(_j, one)
+						_j = _mm256_add_epi64(_j, one);
 					}
 					_i = _mm256_add_epi64(_i, four);
 				}
@@ -39598,9 +39829,9 @@ namespace matrix
 
 			val1 = _mm_max_ps(val1, val2);
 
-			float max = _mm_cvtss_f32(val1);
+			float temp_max_f = _mm_cvtss_f32(val1);
 
-			if (temp_max_d < max) max = temp_max_d;
+			if (temp_max_f > max) max = temp_max_f;
 
 			return max;
 		}
@@ -39708,7 +39939,7 @@ namespace matrix
 
 						_max = _mm_blend_ps(_max, a, mask);
 
-						_j = _mm256_add_epi64(_j, one)
+						_j = _mm256_add_epi64(_j, one);
 					}
 					_i = _mm256_add_epi64(_i, four);
 				}
@@ -39977,21 +40208,21 @@ namespace matrix
 
 		template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
 			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-		inline matrix<float, returnTransposed> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
+		inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
 
 		// Activation functions
 
 		// ReLU
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> relu()
+		inline matrix<float> relu()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -40010,7 +40241,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_max_ps(zero, a));
+							_mm256_store_ps(&dataResult[i], _mm256_max_ps(zero, a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -40172,7 +40403,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_max_ps(zero, a));
+						_mm256_store_ps(&data1[i], _mm256_max_ps(zero, a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -40251,14 +40482,14 @@ namespace matrix
 		// LReLU
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> lrelu()
+		inline matrix<float> lrelu()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -40277,7 +40508,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_max_ps(zero, a));
+							_mm256_store_ps(&dataResult[i], _mm256_max_ps(zero, a));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -40439,7 +40670,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_max_ps(zero, a));
+						_mm256_store_ps(&data1[i], _mm256_max_ps(zero, a));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -40518,14 +40749,14 @@ namespace matrix
 		// Sigmoid
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> sigmoid()
+		inline matrix<float> sigmoid()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -40546,7 +40777,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_div_ps(one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(a, mask)), one)));
+							_mm256_store_ps(&dataResult[i], _mm256_div_ps(one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(a, mask)), one)));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -40710,7 +40941,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_div_ps(one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(a, mask)), one)));
+						_mm256_store_ps(&data1[i], _mm256_div_ps(one, _mm256_add_ps(_mm256_exp_ps(_mm256_xor_ps(a, mask)), one)));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -40788,14 +41019,14 @@ namespace matrix
 		// Softplus
 
 		template<bool returnTransposed = false>
-		inline matrix<float, returnTransposed> softplus()
+		inline matrix<float> softplus()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
 
 			float* data1 = this->_data;
 
-			matrix<float, returnTransposed> result(rows, cols);
+			matrix<float> result(rows, cols);
 
 			float* dataResult = result._data;
 
@@ -40814,7 +41045,7 @@ namespace matrix
 						{
 							__m256 a = _mm256_load_ps(&data1[i]);
 
-							_mm256_store_ps(&dataResult[i]; _mm256_log_ps(_mm256_add_ps(one, _mm256_exp_ps(a))));
+							_mm256_store_ps(&dataResult[i], _mm256_log_ps(_mm256_add_ps(one, _mm256_exp_ps(a))));
 						}
 						for (size_t i = finalPosSize; i < size; i++)
 						{
@@ -40974,7 +41205,7 @@ namespace matrix
 					{
 						__m256 a = _mm256_load_ps(&data1[i]);
 
-						_mm256_store_ps(&data1[i]; _mm256_log_ps(_mm256_add_ps(one, _mm256_exp_ps(a))));
+						_mm256_store_ps(&data1[i], _mm256_log_ps(_mm256_add_ps(one, _mm256_exp_ps(a))));
 					}
 					for (size_t i = finalPosSize; i < size; i++)
 					{
@@ -40999,7 +41230,7 @@ namespace matrix
 					}
 					for (size_t i = finalPosRows; i < rows; i++)
 					{
-						for (size_t j = finalP0osCols; j < cols; j++)
+						for (size_t j = finalPosCols; j < cols; j++)
 						{
 							data1[j * matrix1ActualRows + i] = std::log(1.0f + std::exp(data1[j * matrix1ActualRows + i]));
 						}
@@ -41059,7 +41290,8 @@ namespace matrix
 
 	// Where
 
-	inline vector<double> where(vector<uint8_t>& vector1, vector<double>& vector2, vector<double>& vector3)
+	template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
+	inline vector<double> where(vector<uint8_t, callDestructor1>& vector1, vector<double, callDestructor2>& vector2, vector<double, callDestructor3>& vector3)
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size || vector2._size != vector3._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -41079,9 +41311,9 @@ namespace matrix
 
 		for (size_t i = 0; i < finalPos; i += 4)
 		{
-			int mask = _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]));
+			__m256d mask = _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_loadu_epi8(&data1[i])));
 
-			_mm256_store_pd(&dataResult[i], _mm256_blend_pd(_mm256_load_pd(&data3[i]), _mm256_load_pd(&data2[i]), mask));
+			_mm256_store_pd(&dataResult[i], _mm256_blendv_pd(_mm256_load_pd(&data3[i]), _mm256_load_pd(&data2[i]), mask));
 		}
 		for (size_t i = finalPos; i < size; i++)
 		{
@@ -41089,8 +41321,9 @@ namespace matrix
 		}
 		return result;
 	}
-
-	inline vector<float> where(vector<uint8_t>& vector1, vector<float>& vector2, vector<float>& vector3)
+	
+	template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
+	inline vector<float> where(vector<uint8_t, callDestructor1>& vector1, vector<float, callDestructor2>& vector2, vector<float, callDestructor3>& vector3)
 
 	{
 #ifdef _DEBUG
@@ -41111,9 +41344,9 @@ namespace matrix
 
 		for (size_t i = 0; i < finalPos; i += 8)
 		{
-			int mask = _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]));
+			__m256 mask = _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i])));
 
-			_mm256_store_ps(&dataResult[i], _mm256_blend_ps(_mm256_load_ps(&data3[i]), _mm256_load_ps(&data2[i]), mask));
+			_mm256_store_ps(&dataResult[i], _mm256_blendv_ps(_mm256_load_ps(&data3[i]), _mm256_load_ps(&data2[i]), mask));
 		}
 		for (size_t i = finalPos; i < size; i++)
 		{
@@ -41122,7 +41355,8 @@ namespace matrix
 		return result;
 	}
 
-	inline vector<uint64_t> where(vector<uint8_t>& vector1, vector<uint64_t>& vector2, vector<uint64_t>& vector3)
+	template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
+	inline vector<uint64_t> where(vector<uint8_t, callDestructor1>& vector1, vector<uint64_t, callDestructor2>& vector2, vector<uint64_t, callDestructor3>& vector3)
 
 	{
 #ifdef _DEBUG
@@ -41143,9 +41377,9 @@ namespace matrix
 
 		for (size_t i = 0; i < finalPos; i += 4)
 		{
-			int mask = _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]));
+			__m256d mask = _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_loadu_epi8(&data1[i])));
 
-			_mm256_storeu_epi64(&dataResult[i], _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(_mm256_loadu_epi64(&data3[i])), _mm256_castsi256_pd(_mm256_loadu_epi64(&data2[i])), mask)));
+			_mm256_storeu_epi64(&dataResult[i], _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(_mm256_loadu_epi64(&data3[i])), _mm256_castsi256_pd(_mm256_loadu_epi64(&data2[i])), mask)));
 		}
 		for (size_t i = finalPos; i < size; i++)
 		{
@@ -41154,7 +41388,8 @@ namespace matrix
 		return result;
 	}
 
-	inline vector<int> where(vector<uint8_t>& vector1, vector<int>& vector2, vector<int>& vector3)
+	template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
+	inline vector<int> where(vector<uint8_t, callDestructor1>& vector1, vector<int, callDestructor2>& vector2, vector<int, callDestructor3>& vector3)
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size || vector2._size != vector3._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -41174,9 +41409,9 @@ namespace matrix
 
 		for (size_t i = 0; i < finalPos; i += 8)
 		{
-			int mask = _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]));
+			__m256 mask = _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i])));
 
-			_mm256_storeu_epi32(&dataResult[i], _mm256_castps_si256(_mm256_blend_ps(_mm256_castsi256_ps(_mm256_loadu_epi32(&data3[i])), _mm256_castsi256_ps(_mm256_loadu_epi32(&data2[i])), mask)));
+			_mm256_storeu_epi32(&dataResult[i], _mm256_castps_si256(_mm256_blendv_ps(_mm256_castsi256_ps(_mm256_loadu_epi32(&data3[i])), _mm256_castsi256_ps(_mm256_loadu_epi32(&data2[i])), mask)));
 		}
 		for (size_t i = finalPos; i < size; i++)
 		{
@@ -41187,7 +41422,8 @@ namespace matrix
 
 	// Dot
 
-	inline double dot(vector<double>& vector1, vector<double>& vector2)
+	template <bool callDestructor1, bool callDestructor2>
+	inline double dot(vector<double, callDestructor1>& vector1, vector<double, callDestructor2>& vector2)
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -41230,70 +41466,9 @@ namespace matrix
 		return dotProduct;
 	}
 
-	inline vector<double> dot(matrix<double>& matrix1, vector<double>& vector2)
-	{
-#ifdef _DEBUG
-		if (matrix1._cols != vector2._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-		size_t cols = matrix1._cols;
-		size_t rows = matrix1._rows;
-
-		size_t size = matrix1._size;
-
-		size_t matrix1ActualCols = matrix1.actualCols;
-
-		size_t finalPosCols = matrix1.finalPosCols;
-		size_t finalPosRows = matrix1.finalPosRows;
-
-		double* data1 = matrix1._data;
-		double* data2 = vector2._data;
-
-		vector<double> result(rows);
-
-		double* dataResult = result._data;
-
-		for (size_t i = 0; i < finalPosRows; i += 4)
-		{
-			__m256d _sum = _mm256_setzero_pd();
-			for (size_t j = 0; j < cols; j++)
-			{
-				_sum = _mm256_fmadd_pd(_mm256_setr_pd(data1[i * matrix1ActualCols + j], 
-					data1[(i + 1) * matrix1ActualCols + j], 
-					data1[(i + 2) * matrix1ActualCols + j], 
-					data1[(i + 3) * matrix1ActualCols + j]), _mm256_set1_pd(data2[j]), _sum);
-			}
-			_mm256_store_pd(&dataResult[i], _sum);
-		}
-		for (size_t i = finalPosRows; i < rows; i++)
-		{
-			__m256d _sum = _mm256_setzero_pd();
-			double sum = 0.0;
-			for (size_t j = 0; j < finalPosCols; j += 4)
-			{
-				_sum = _mm256_fmadd_pd(_mm256_load_pd(&data1[i * matrix1ActualCols + j]),
-					_mm256_load_pd(&data2[j]), _sum);
-			}
-			for (size_t j = finalPosCols; j < cols; j++)
-			{
-				sum += data1[i * matrix1ActualCols + j] * data2[j];
-			}
-
-			__m128d vlow = _mm256_castpd256_pd128(_sum);
-			__m128d vhigh = _mm256_extractf128_pd(_sum, 1);
-			vlow = _mm_add_pd(vlow, vhigh);
-
-			__m128d high64 = _mm_unpackhi_pd(vlow, vlow);
-			sum += _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
-
-			dataResult[i] = sum;
-		}
-		return result;
-	}
-
 	template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
 			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-	inline matrix<double, returnTransposed> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>& matrix1, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>& matrix2)
+	inline matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>& matrix1, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>& matrix2)
 	{
 #ifdef _DEBUG
 		if (matrix1._cols != matrix2._rows) throw std::invalid_argument("Wrong dimensions");
@@ -41309,9 +41484,9 @@ namespace matrix
 		double* data1 = matrix1._data;
 		double* data2 = matrix1._data;
 
-		matrix<uint8_t, returnTransposed> result(matrix1Rows, matrix2Cols);
+		matrix<double> result(matrix1Rows, matrix2Cols);
 
-		uint8_t* dataResult = result._data;
+		double* dataResult = result._data;
 
 		if constexpr (matrix1Transposed)
 		{
@@ -41715,7 +41890,7 @@ namespace matrix
 							for (size_t k = 0; k < matrix1Cols; k++)
 							{
 								_sum = _mm256_fmadd_pd(_mm256_set1_pd(data1[i * matrix1ActualCols + k]),
-									_mm256_load_pd(data2[k * matrix2ActualCols + j]), _sum);
+									_mm256_load_pd(&data2[k * matrix2ActualCols + j]), _sum);
 							}
 							_mm256_store_pd(&dataResult[i * matrix2Cols + j], _sum);
 						}
@@ -41756,9 +41931,8 @@ namespace matrix
 		return result;
 	}
 
-	// --
-
-	inline float dot(vector<float>& vector1, vector<float>& vector2)
+	template <bool callDestructor1, bool callDestructor2>
+	inline float dot(vector<float, callDestructor1>& vector1, vector<float, callDestructor2>& vector2)
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -41775,8 +41949,6 @@ namespace matrix
 
 		float* dataResult = result._data;
 
-		float dotProduct = 0.0f;
-
 		__m256 _dotProduct = _mm256_setzero_ps();
 
 		for (size_t i = 0; i < finalPos; i += 8)
@@ -41786,91 +41958,26 @@ namespace matrix
 
 			_dotProduct = _mm256_fmadd_ps(a, b, _dotProduct);
 		}
+
+		__m256 _sum1 = _mm256_hadd_ps(_dotProduct, _dotProduct);
+		__m256 _sum2 = _mm256_hadd_ps(_sum1, _sum1);
+
+		__m128 lo128 = _mm256_castps256_ps128(_sum2);
+		__m128 hi128 = _mm256_extractf128_ps(_sum2, 1);
+		__m128 result128 = _mm_add_ps(lo128, hi128);
+		float dotProduct = _mm_cvtss_f32(result128);
+
 		for (size_t i = finalPos; i < size; i++)
 		{
 			dotProduct += data1[i] * data2[i];
 		}
 
-		__m128 vlow = _mm256_castps256_ps128(_dotProduct);
-		__m128 vhigh = _mm256_extractf128_ps(_dotProduct, 1);
-		vlow = _mm_add_ps(vlow, vhigh);
-
-		__m128 high64 = _mm_unpackhi_ps(vlow, vlow);
-		dotProduct += _mm_cvtss_f32(_mm_add_ss(vlow, high64));
-
 		return dotProduct;
-	}
-
-	inline vector<float> dot(matrix<float>& matrix1, vector<float>& vector2)
-	{
-#ifdef _DEBUG
-		if (matrix1._cols != vector2._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
-#else
-#endif
-		size_t cols = matrix1._cols;
-		size_t rows = matrix1._rows;
-
-		size_t size = matrix1._size;
-
-		size_t matrix1ActualCols = matrix1.actualCols;
-
-		size_t finalPosCols = matrix1.finalPosCols;
-		size_t finalPosRows = matrix1.finalPosRows;
-
-		float* data1 = matrix1._data;
-		float* data2 = vector2._data;
-
-		vector<float> result(rows);
-
-		float* dataResult = result._data;
-
-		for (size_t i = 0; i < finalPosRows; i += 8)
-		{
-			__m256 _sum = _mm256_setzero_ps();
-			for (size_t j = 0; j < cols; j++)
-			{
-				_sum = _mm256_fmadd_ps(_mm256_setr_ps(data1[i * matrix1ActualCols + j],
-					data1[(i + 1) * matrix1ActualCols + j],
-					data1[(i + 2) * matrix1ActualCols + j],
-					data1[(i + 3) * matrix1ActualCols + j], 
-					data1[(i + 4) * matrix1ActualCols + j],
-					data1[(i + 5) * matrix1ActualCols + j],
-					data1[(i + 6) * matrix1ActualCols + j],
-					data1[(i + 7) * matrix1ActualCols + j]), _mm256_set1_ps(data2[j]), _sum);
-			}
-			_mm256_store_ps(&dataResult[i], _sum);
-		}
-		for (size_t i = finalPosRows; i < rows; i++)
-		{
-			__m256 _sum = _mm256_setzero_ps();
-			float sum = 0.0f;
-			for (size_t j = 0; j < finalPosCols; j += 8)
-			{
-				_sum = _mm256_fmadd_ps(_mm256_load_ps(&data1[i * matrix1ActualCols + j]),
-					_mm256_load_ps(&data2[j]), _sum);
-			}
-			for (size_t j = finalPosCols; j < cols; j++)
-			{
-				sum += data1[i * matrix1ActualCols + j] * data2[j];
-			}
-
-			__m256 _sum1 = _mm256_hadd_ps(_sum, _sum);
-			__m256 _sum2 = _mm256_hadd_ps(_sum1, _sum1);
-
-			__m128 lo128 = _mm256_castps256_ps128(_sum2);
-			__m128 hi128 = _mm256_extractf128_ps(_sum2, 1);
-			__m128 result128 = _mm_add_ps(lo128, hi128);
-
-			sum += _mm_cvtss_f32(result128);
-
-			dataResult[i] = sum;
-		}
-		return result;
 	}
 	
 	template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
 		bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-	inline matrix<float, returnTransposed> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>& matrix1, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>& matrix2)
+	inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>& matrix1, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>& matrix2)
 	{
 #ifdef _DEBUG
 		if (matrix1._cols != matrix2._rows) throw std::invalid_argument("Wrong dimensions");
@@ -41886,9 +41993,9 @@ namespace matrix
 		float* data1 = matrix1._data;
 		float* data2 = matrix1._data;
 
-		matrix<uint8_t, returnTransposed> result(matrix1Rows, matrix2Cols);
+		matrix<float> result(matrix1Rows, matrix2Cols);
 
-		uint8_t* dataResult = result._data;
+		float* dataResult = result._data;
 
 		if constexpr (matrix1Transposed)
 		{
@@ -42284,7 +42391,7 @@ namespace matrix
 							for (size_t k = 0; k < matrix1Cols; k++)
 							{
 								_sum = _mm256_fmadd_ps(_mm256_set1_ps(data1[i * matrix1ActualCols + k]),
-									_mm256_load_ps(data2[k * matrix2ActualCols + j]), _sum);
+									_mm256_load_ps(&data2[k * matrix2ActualCols + j]), _sum);
 							}
 							_mm256_store_ps(&dataResult[i * matrix2Cols + j], _sum);
 						}
@@ -42301,15 +42408,20 @@ namespace matrix
 									_mm256_setr_ps(data2[k * matrix2ActualCols + j],
 										data2[(k + 1) * matrix2ActualCols + j],
 										data2[(k + 2) * matrix2ActualCols + j],
-										data2[(k + 3) * matrix2ActualCols + j]), _sum);
+										data2[(k + 3) * matrix2ActualCols + j], 
+										data2[(j + 4) * matrix2ActualCols + j],
+										data2[(k + 5) * matrix2ActualCols + j],
+										data2[(k + 6) * matrix2ActualCols + j],
+										data2[(k + 7) * matrix2ActualCols + j]), _sum);
 							}
 
-							__m128d vlow = _mm256_castpd256_ps128(_sum);
-							__m128d vhigh = _mm256_extractf128_ps(_sum, 1);
-							vlow = _mm_add_ps(vlow, vhigh);
+							__m256 _sum1 = _mm256_hadd_ps(_sum, _sum);
+							__m256 _sum2 = _mm256_hadd_ps(_sum1, _sum1);
 
-							__m128d high64 = _mm_unpackhi_ps(vlow, vlow);
-							float sum = _mm_cvtsd_f64(_mm_add_sd(vlow, high64));
+							__m128 lo128 = _mm256_castps256_ps128(_sum2);
+							__m128 hi128 = _mm256_extractf128_ps(_sum2, 1);
+							__m128 result128 = _mm_add_ps(lo128, hi128);
+							float sum = _mm_cvtss_f32(result128);
 
 							for (size_t k = matrix1FinalPosCols; k < matrix1Cols; k++)
 							{
@@ -42324,58 +42436,8 @@ namespace matrix
 		}
 		return result;
 	}
-
-	// Identity
-
-	template<bool returnTransposed>
-	inline matrix<double, returnTransposed> identity(size_t n)
-	{
-		matrix<double, returnTransposed> result(n, n);
-
-		double* dataResult = result._data;
-
-		size_t size = result.size;
-
-		if constexpr (returnTransposed)
-		{
-			for (size_t i = 0; i < n; i++)
-			{
-				for (size_t j = 0; j < n; i++)
-				{
-					if (i == j)
-					{
-						dataResult[j * n + i] = 1.0;
-					}
-					else
-					{
-						dataResult[j * n + i] = 0.0;
-					}
-				}
-			}
-		}
-		else
-		{
-			for (size_t i = 0; i < n; i++)
-			{
-				for (size_t j = 0; j < n; i++)
-				{
-					if (i == j)
-					{
-						dataResult[i * n + j] = 1.0;
-					}
-					else
-					{
-						dataResult[i * n + j] = 0.0;
-					}
-				}
-			}
-		}
-		return result;
-	}
 	
 
 	//---------------------------------------------------------------------------
-
-	
 
 }
