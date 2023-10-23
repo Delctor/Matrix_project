@@ -119,14 +119,7 @@ namespace matrix
 		friend inline vector<int> where(vector<uint8_t, callDestructor1>&, vector<int, callDestructor2>&, vector<int, callDestructor3>&);
 
 		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<uint8_t, otherCallDestructor>& vector)
-		{
-			for (size_t i = 0; i < vector._size; i++)
-			{
-				std::cout << (vector._data[i] ? 1 : 0) << std::endl;
-			}
-			return os;
-		}
+		friend std::ostream& operator<<(std::ostream& os, const vector<uint8_t, otherCallDestructor>& vector);
 
 		inline uint8_t* data() { return this->_data; }
 
@@ -142,6 +135,14 @@ namespace matrix
 		{
 			uint8_t* data = this->_data;
 			return data[index];
+		}
+
+		inline vector<uint8_t, thisCallDestructor> block(size_t initial, size_t final)
+		{
+			return vector<uint8_t, thisCallDestructor>(
+				&this->_data[initial],
+				final - initial
+			);
 		}
 
 		// &&
@@ -451,14 +452,7 @@ namespace matrix
 		friend inline vector<uint64_t> where(vector<uint8_t, callDestructor1>&, vector<uint64_t, callDestructor2>&, vector<uint64_t, callDestructor3>&);
 
 		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<uint64_t, otherCallDestructor>& vector)
-		{
-			for (size_t i = 0; i < vector._size; i++)
-			{
-				std::cout << vector._data[i] << std::endl;
-			}
-			return os;
-		}
+		friend std::ostream& operator<<(std::ostream& os, const vector<uint64_t, otherCallDestructor>& vector);
 
 		inline uint64_t* data() { return this->_data; }
 
@@ -474,6 +468,16 @@ namespace matrix
 		{
 			uint64_t* data = this->_data;
 			return data[index];
+		}
+
+		// Block
+
+		inline vector<uint64_t, thisCallDestructor> block(size_t initial, size_t final)
+		{
+			return vector<uint64_t, thisCallDestructor>(
+				&this->_data[initial],
+				final - initial
+			);
 		}
 
 		// Set Constant
@@ -1826,6 +1830,29 @@ namespace matrix
 					_mm_storeu_epi32(&dataResult[i], _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(_mm256_loadu_epi64(&data1[i]), indices)));
 				}
 			}
+			else if constexpr (std::is_same<T, uint8_t>::value)
+			{
+				__m256d zero = _mm256_setzero_pd();
+
+				for (size_t i = 0; i < finalPos; i += 4)
+				{
+					__m256i mask = _mm256_castpd_si256(_mm256_cmp_pd(_mm256_castsi256_pd(_mm256_loadu_epi64(&data1[i])), zero, _CMP_NEQ_OQ));
+
+					__m128i mask1 = _mm256_castsi256_si128(mask);
+					__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+					mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+					mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+					__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+					_mm_store_ss(reinterpret_cast<float*>(&dataResult[i]), _mm_castsi128_ps(maskResult));
+				}
+				for (size_t i = finalPos; i < size; i++)
+				{
+					dataResult[i] = data1[i] ? True : False;
+				}
+			}
 			else
 			{
 				for (size_t i = 0; i < size; i++)
@@ -1869,14 +1896,7 @@ namespace matrix
 		friend inline double dot(vector<double, callDestructor1>&, vector<double, callDestructor2>&);
 
 		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<double, otherCallDestructor>& vector)
-		{
-			for (size_t i = 0; i < vector._size; i++)
-			{
-				std::cout << vector._data[i] << std::endl;
-			}
-			return os;
-		}
+		friend std::ostream& operator<<(std::ostream& os, const vector<double, otherCallDestructor>& vector);
 
 		inline double& operator[](size_t index)
 		{
@@ -1888,6 +1908,18 @@ namespace matrix
 		{
 			double* data = this->_data;
 			return data[index];
+		}
+
+		inline double* data() { return this->_data; }
+
+		// Block
+
+		inline vector<double, thisCallDestructor> block(size_t initial, size_t final)
+		{
+			return vector<double, thisCallDestructor>(
+				&this->_data[initial],
+				final - initial
+			);
 		}
 
 		// Set Constant
@@ -4321,7 +4353,7 @@ namespace matrix
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
-					dataResult[i] = data1[i] =! 0.0 ? True : False;
+					dataResult[i] = data1[i] ? True : False;
 				}
 			}
 			else if constexpr (std::is_same<T, float>::value)
@@ -4343,7 +4375,9 @@ namespace matrix
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
-					dataResult[i] = static_cast<int>(data1[i]);
+					double data = data1[i];
+					data += 6755399441055744.0;
+					dataResult[i] = reinterpret_cast<int&>(data);
 				}
 			}
 			else
@@ -4379,14 +4413,7 @@ namespace matrix
 		friend class vector;
 
 		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<float, otherCallDestructor>& vector)
-		{
-			for (size_t i = 0; i < vector._size; i++)
-			{
-				std::cout << vector._data[i] << std::endl;
-			}
-			return os;
-		}
+		friend std::ostream& operator<<(std::ostream& os, const vector<float, otherCallDestructor>& vector);
 
 		template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
 		friend inline vector<float> where(vector<uint8_t, callDestructor1>&, vector<float, callDestructor2>&, vector<float, callDestructor3>&);
@@ -4404,6 +4431,18 @@ namespace matrix
 		{
 			float* data = this->_data;
 			return data[index];
+		}
+
+		inline float* data() { return this->_data; }
+
+		// Block
+
+		inline vector<float, thisCallDestructor> block(size_t initial, size_t final)
+		{
+			return vector<float, thisCallDestructor>(
+				&this->_data[initial],
+				final - initial
+			);
 		}
 
 		// Set Constant
@@ -6886,14 +6925,7 @@ namespace matrix
 		friend inline vector<int> where(vector<uint8_t, otherCallDestructor1>&, vector<int, otherCallDestructor2>&, vector<int, otherCallDestructor3>&);
 
 		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<int, otherCallDestructor>& vector)
-		{
-			for (size_t i = 0; i < vector._size; i++)
-			{
-				std::cout << vector._data[i] << std::endl;
-			}
-			return os;
-		}
+		friend std::ostream& operator<<(std::ostream& os, const vector<int, otherCallDestructor>& vector);
 
 		// -----
 
@@ -6911,6 +6943,16 @@ namespace matrix
 		{
 			int* data = this->_data;
 			return data[index];
+		}
+
+		// Block
+
+		inline vector<int, thisCallDestructor> block(size_t initial, size_t final)
+		{
+			return vector<int, thisCallDestructor>(
+				&this->_data[initial],
+				final - initial
+			);
 		}
 
 		// Set Constant
@@ -8109,7 +8151,7 @@ namespace matrix
 				__m256i indices = _mm256_setr_epi32(0, 7, 2, 3, 4, 5, 6, 1);
 				for (size_t i = 0; i < finalPos; i += 8)
 				{
-					__m256i mask = _mm256_cmpeq_epi32(_mm256_loadu_epi32(&data1[i]), zero);
+					__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(_mm256_castsi256_ps(_mm256_loadu_epi32(&data1[i])), zero, _CMP_NEQ_OQ));
 					__m256i mask1 = _mm256_packs_epi32(mask, mask);
 					__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
 
@@ -8119,7 +8161,7 @@ namespace matrix
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
-					dataResult[i] = data1[i] != 0 ? True : False;
+					dataResult[i] = data1[i] ? True : False;
 				}
 			}
 			else
@@ -8166,7 +8208,7 @@ namespace matrix
 			finalPosCols((_cols / 4) * 4),
 			finalPosSize((_size / 4) * 4) {}
 
-		~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
 
 		// Friend classes
 
@@ -8183,55 +8225,21 @@ namespace matrix
 		friend inline matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
-		{
-			size_t rows = matrix._rows;
-			size_t cols = matrix._cols;
-
-			double* data1 = matrix._data;
-
-			if constexpr (otherTransposed)
-			{
-				size_t actualRows = matrix.actualRows;
-
-				for (size_t i = 0; i < rows; i++)
-				{
-					for (size_t j = 0; j < rows; j++)
-					{
-						std::cout << data1[j * actualRows + i] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			else
-			{
-				size_t actualCols = matrix.actualCols;
-
-				for (size_t i = 0; i < rows; i++)
-				{
-					for (size_t j = 0; j < rows; j++)
-					{
-						std::cout << data1[i * actualCols + j] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			return os;
-		}
+		friend std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& matrix);
 
 		//----------------
 
-		size_t rows() { return this->_rows; }
+		inline size_t rows() { return this->_rows; }
 
-		size_t cols() { return this->_cols; }
+		inline size_t cols() { return this->_cols; }
 
-		double* data() { return this->_data; }
+		inline double* data() { return this->_data; }
 
-		matrix<double, thisTransposed, !thisTransposed, false> row(size_t row)
+		inline matrix<double, thisTransposed, thisContiguous, false> row(size_t row)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<double, true, false, false>(
+				return matrix<double, true, thisContiguous, false>(
 					&this->_data[row],
 					1,
 					this->_cols,
@@ -8240,7 +8248,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<double, false, true, false>(
+				return matrix<double, false, thisContiguous, false>(
 					&this->_data[row * this->actualCols],
 					1,
 					this->_cols,
@@ -8249,54 +8257,41 @@ namespace matrix
 			}
 		}
 
-		matrix<double, thisTransposed, thisTransposed, false> col(size_t col)
+		inline matrix<double, thisTransposed, thisContiguous, false> col(size_t col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<double, true, true, false>(
+				return matrix<double, true, thisContiguous, false>(
 					&this->_data[col * this->actualRows],
+					this->_rows,
 					1,
-					this->_cols,
 					this->actualRows,
 					this->actualCols);
 			}
 			else
 			{
-				return matrix<double, false, false, false>(
+				return matrix<double, false, thisContiguous, false>(
 					&this->_data[col],
+					this->_rows,
 					1,
-					this->_cols,
 					this->actualRows,
 					this->actualCols);
 			}
 		}
 
-		matrix<double, !thisTransposed, thisContiguous, false> tranpose()
+		inline matrix<double, !thisTransposed, thisContiguous, false> tranpose()
 		{
-			if constexpr (thisTransposed)
-			{
-				return matrix<double, false, thisContiguous, false>(
-					this->_data,
-					this->_rows,
-					this->_cols,
-					this->actualCols,
-					this->actualRows
-				);
-			}
-			else
-			{
-				return matrix<double, true, thisContiguous, false>(
-					this->_data,
-					this->_rows,
-					this->_cols,
-					this->actualRows,
-					this->actualCols
-				);
-			}
+			return matrix<double, !thisTransposed, thisContiguous, false>(
+				this->_data,
+				this->_cols,
+				this->_rows,
+				this->actualCols,
+				this->actualRows
+			);
 		}
 
 		template<bool blockContiguous = false>
-		matrix<double, thisTransposed, thisContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
+		inline matrix<double, thisTransposed, thisContiguous && blockContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
 		{
 			if constexpr (thisTransposed)
 			{
@@ -8320,7 +8315,7 @@ namespace matrix
 			}
 		}
 
-		double& operator()(size_t row, size_t col)
+		inline double& operator()(size_t row, size_t col)
 		{
 			if constexpr (thisTransposed)
 			{
@@ -8332,7 +8327,7 @@ namespace matrix
 			}
 		}
 
-		const double& operator()(size_t row, size_t col) const 
+		inline const double& operator()(size_t row, size_t col) const 
 		{
 			if constexpr (thisTransposed)
 			{
@@ -8346,7 +8341,7 @@ namespace matrix
 
 		// Set constant
 
-		void set_const(double num)
+		inline void set_const(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -8387,7 +8382,7 @@ namespace matrix
 
 		// Rand
 
-		void rand()
+		inline void rand()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -8591,7 +8586,7 @@ namespace matrix
 
 		// Identity
 
-		void identity()
+		inline void identity()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -8604,7 +8599,7 @@ namespace matrix
 
 				for (size_t i = 0; i < rows; i++)
 				{
-					for (size_t j = 0; j < rows; j++)
+					for (size_t j = 0; j < cols; j++)
 					{
 						if (i == j)
 						{
@@ -8623,7 +8618,7 @@ namespace matrix
 
 				for (size_t i = 0; i < rows; i++)
 				{
-					for (size_t j = 0; j < rows; j++)
+					for (size_t j = 0; j < cols; j++)
 					{
 						if (i == j)
 						{
@@ -8641,7 +8636,7 @@ namespace matrix
 		// +
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double> operator+(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<double> operator+(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -9000,7 +8995,7 @@ namespace matrix
 
 						for (size_t i = 0; i < finalPosRows; i += 4)
 						{
-							for (size_t j = 0; j < rows; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 									data1[(i + 1) * matrix1ActualCols + j],
@@ -9115,7 +9110,7 @@ namespace matrix
 		}
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		void operator+=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline void operator+=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -9377,7 +9372,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> operator+(double num)
+		inline matrix<double> operator+(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -9512,7 +9507,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 4)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -9614,7 +9609,7 @@ namespace matrix
 			return result;
 		}
 
-		void operator+=(double num)
+		inline void operator+=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -9755,7 +9750,7 @@ namespace matrix
 		// -
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double> operator-(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<double> operator-(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -10114,7 +10109,7 @@ namespace matrix
 
 						for (size_t i = 0; i < finalPosRows; i += 4)
 						{
-							for (size_t j = 0; j < rows; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 									data1[(i + 1) * matrix1ActualCols + j],
@@ -10229,7 +10224,7 @@ namespace matrix
 		}
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		void operator-=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline void operator-=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -10491,7 +10486,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> operator-(double num)
+		inline matrix<double> operator-(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -10626,7 +10621,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 4)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -10728,7 +10723,7 @@ namespace matrix
 			return result;
 		}
 
-		void operator-=(double num)
+		inline void operator-=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -10869,7 +10864,7 @@ namespace matrix
 		// *
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double> operator*(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<double> operator*(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -11228,7 +11223,7 @@ namespace matrix
 
 						for (size_t i = 0; i < finalPosRows; i += 4)
 						{
-							for (size_t j = 0; j < rows; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 									data1[(i + 1) * matrix1ActualCols + j],
@@ -11343,7 +11338,7 @@ namespace matrix
 		}
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		void operator*=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline void operator*=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -11605,7 +11600,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> operator*(double num)
+		inline matrix<double> operator*(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -11740,7 +11735,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 4)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -11842,7 +11837,7 @@ namespace matrix
 			return result;
 		}
 
-		void operator*=(double num)
+		inline void operator*=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -11983,7 +11978,7 @@ namespace matrix
 		// /
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double> operator/(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<double> operator/(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -12342,7 +12337,7 @@ namespace matrix
 
 						for (size_t i = 0; i < finalPosRows; i += 4)
 						{
-							for (size_t j = 0; j < rows; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 									data1[(i + 1) * matrix1ActualCols + j],
@@ -12457,7 +12452,7 @@ namespace matrix
 		}
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		void operator/=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline void operator/=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -12719,7 +12714,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> operator/(double num)
+		inline matrix<double> operator/(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -12854,7 +12849,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 4)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -12956,7 +12951,7 @@ namespace matrix
 			return result;
 		}
 
-		void operator/=(double num)
+		inline void operator/=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -13097,7 +13092,7 @@ namespace matrix
 		// ==
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t> operator==(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator==(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -13442,7 +13437,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t> operator==(double num)
+		inline matrix<uint8_t> operator==(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -13617,7 +13612,7 @@ namespace matrix
 		// !=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t> operator!=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator!=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -13962,7 +13957,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t> operator!=(double num)
+		inline matrix<uint8_t> operator!=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -14137,7 +14132,7 @@ namespace matrix
 		// >
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t> operator>(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator>(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -14482,7 +14477,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t> operator>(double num)
+		inline matrix<uint8_t> operator>(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -14657,7 +14652,7 @@ namespace matrix
 		// <
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t> operator<(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator<(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -15002,7 +14997,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t> operator<(double num)
+		inline matrix<uint8_t> operator<(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -15177,7 +15172,7 @@ namespace matrix
 		// >=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t> operator>=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator>=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -15522,7 +15517,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t> operator>=(double num)
+		inline matrix<uint8_t> operator>=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -15697,7 +15692,7 @@ namespace matrix
 		// <=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<uint8_t> operator<=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<uint8_t> operator<=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -16042,7 +16037,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<uint8_t> operator<=(double num)
+		inline matrix<uint8_t> operator<=(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -16217,7 +16212,7 @@ namespace matrix
 		// Functions
 
 		template<bool returnTransposed = false>
-		matrix<double> exp()
+		inline matrix<double> exp()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -16449,7 +16444,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_exp()
+		inline void self_exp()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -16584,7 +16579,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> exp2()
+		inline matrix<double> exp2()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -16816,7 +16811,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_exp2()
+		inline void self_exp2()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -16951,7 +16946,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> log()
+		inline matrix<double> log()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -17183,7 +17178,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_log()
+		inline void self_log()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -17318,7 +17313,7 @@ namespace matrix
 		}
 		
 		template<bool returnTransposed = false>
-		matrix<double> log2()
+		inline matrix<double> log2()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -17550,7 +17545,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_log2()
+		inline void self_log2()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -17685,7 +17680,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> log10()
+		inline matrix<double> log10()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -17917,7 +17912,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_log10()
+		inline void self_log10()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -18054,7 +18049,7 @@ namespace matrix
 #define _mm256_abs_pd(a) _mm256_andnot_pd(mask, (a))
 
 		template<bool returnTransposed = false>
-		matrix<double> abs()
+		inline matrix<double> abs()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -18288,7 +18283,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_abs()
+		inline void self_abs()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -18425,7 +18420,7 @@ namespace matrix
 		}
 		
 		template<bool returnTransposed = false>
-		matrix<double> cos()
+		inline matrix<double> cos()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -18657,7 +18652,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_cos()
+		inline void self_cos()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -18792,7 +18787,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> tan()
+		inline matrix<double> tan()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -19024,7 +19019,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_tan()
+		inline void self_tan()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -19159,7 +19154,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> acos()
+		inline matrix<double> acos()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -19391,7 +19386,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_acos()
+		inline void self_acos()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -19526,7 +19521,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> round()
+		inline matrix<double> round()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -19758,7 +19753,7 @@ namespace matrix
 			return result;
 		}
 		
-		void self_round()
+		inline void self_round()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -19893,7 +19888,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false>
-		matrix<double> floor()
+		inline matrix<double> floor()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -20125,7 +20120,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_floor()
+		inline void self_floor()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -20262,7 +20257,7 @@ namespace matrix
 		// pow
 
 		template<bool returnTransposed = false>
-		matrix<double> pow(double num)
+		inline matrix<double> pow(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -20397,7 +20392,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 4)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -20500,7 +20495,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double> pow(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<double> pow(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -20859,7 +20854,7 @@ namespace matrix
 
 						for (size_t i = 0; i < finalPosRows; i += 4)
 						{
-							for (size_t j = 0; j < rows; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 									data1[(i + 1) * matrix1ActualCols + j],
@@ -20973,7 +20968,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_pow(double num)
+		inline void self_pow(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -21112,7 +21107,7 @@ namespace matrix
 		}
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		void self_pow(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline void self_pow(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -21376,7 +21371,7 @@ namespace matrix
 		// root
 
 		template<bool returnTransposed = false>
-		matrix<double> root(double num)
+		inline matrix<double> root(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -21513,7 +21508,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 4)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -21616,7 +21611,7 @@ namespace matrix
 		}
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		matrix<double> root(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline matrix<double> root(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -21977,7 +21972,7 @@ namespace matrix
 
 						for (size_t i = 0; i < finalPosRows; i += 4)
 						{
-							for (size_t j = 0; j < rows; j++)
+							for (size_t j = 0; j < cols; j++)
 							{
 								__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
 									data1[(i + 1) * matrix1ActualCols + j],
@@ -22091,7 +22086,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_root(double num)
+		inline void self_root(double num)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -22232,7 +22227,7 @@ namespace matrix
 		}
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		void self_root(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		inline void self_root(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -22497,7 +22492,7 @@ namespace matrix
 
 		// Mean 
 
-		vector<double> mean_rowwise()
+		inline vector<double> mean_rowwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -22595,7 +22590,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<double> mean_colwise()
+		inline vector<double> mean_colwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -22695,7 +22690,7 @@ namespace matrix
 			return result;
 		}
 
-		double mean_all()
+		inline double mean_all()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -22791,7 +22786,7 @@ namespace matrix
 
 		// Sum
 
-		vector<double> sum_rowwise()
+		inline vector<double> sum_rowwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -22885,7 +22880,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<double> sum_colwise()
+		inline vector<double> sum_colwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -22981,7 +22976,7 @@ namespace matrix
 			return result;
 		}
 
-		double sum_all()
+		inline double sum_all()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -23076,7 +23071,7 @@ namespace matrix
 
 		// Std
 
-		vector<double> std_rowwise(double ddof = 0.0)
+		inline vector<double> std_rowwise(double ddof = 0.0)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -23216,7 +23211,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<double> std_colwise(double ddof = 0.0)
+		inline vector<double> std_colwise(double ddof = 0.0)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -23356,7 +23351,7 @@ namespace matrix
 			return result;
 		}
 
-		double std_all(double ddof = 0.0, double* mean = nullptr)
+		inline double std_all(double ddof = 0.0, double* mean = nullptr)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -23488,7 +23483,7 @@ namespace matrix
 
 		// Min
 
-		vector<double> min_rowwise()
+		inline vector<double> min_rowwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -23588,7 +23583,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<double> min_colwise()
+		inline vector<double> min_colwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -23690,7 +23685,7 @@ namespace matrix
 			return result;
 		}
 
-		double min_all()
+		inline double min_all()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -23790,7 +23785,7 @@ namespace matrix
 			return min;
 		}
 
-		void argmin_all(size_t* row, size_t* col) 
+		inline void argmin_all(size_t* row, size_t* col)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24004,7 +23999,7 @@ namespace matrix
 			}
 		}
 
-		vector<uint64_t> argmin_rowwise()
+		inline vector<uint64_t> argmin_rowwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24107,7 +24102,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<uint64_t> argmin_colwise()
+		inline vector<uint64_t> argmin_colwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24212,7 +24207,7 @@ namespace matrix
 
 		// Max
 
-		vector<double> max_rowwise()
+		inline vector<double> max_rowwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24312,7 +24307,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<double> max_colwise()
+		inline vector<double> max_colwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24414,7 +24409,7 @@ namespace matrix
 			return result;
 		}
 
-		double max_all()
+		inline double max_all()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24514,7 +24509,7 @@ namespace matrix
 			return max;
 		}
 
-		void argmax_all(size_t* row, size_t* col)
+		inline void argmax_all(size_t* row, size_t* col)
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24728,7 +24723,7 @@ namespace matrix
 			}
 		}
 
-		vector<uint64_t> argmax_rowwise()
+		inline vector<uint64_t> argmax_rowwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24831,7 +24826,7 @@ namespace matrix
 			return result;
 		}
 
-		vector<uint64_t> argmax_colwise()
+		inline vector<uint64_t> argmax_colwise()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -24934,18 +24929,12 @@ namespace matrix
 			return result;
 		}
 
-		// Dot
-
-		template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
-			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-		matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
-
 		// Activation functions
 
 		// ReLU
 
 		template<bool returnTransposed = false>
-		matrix<double> relu()
+		inline matrix<double> relu()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -25179,7 +25168,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_relu()
+		inline void self_relu()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -25318,7 +25307,7 @@ namespace matrix
 		// LReLU
 
 		template<bool returnTransposed = false>
-		matrix<double> lrelu()
+		inline matrix<double> lrelu()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -25552,7 +25541,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_lrelu()
+		inline void self_lrelu()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -25691,7 +25680,7 @@ namespace matrix
 		// Sigmoid
 
 		template<bool returnTransposed = false>
-		matrix<double> sigmoid()
+		inline matrix<double> sigmoid()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -25927,7 +25916,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_sigmoid()
+		inline void self_sigmoid()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -26068,7 +26057,7 @@ namespace matrix
 		// Softplus
 		
 		template<bool returnTransposed = false>
-		matrix<double> softplus()
+		inline matrix<double> softplus()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -26302,7 +26291,7 @@ namespace matrix
 			return result;
 		}
 
-		void self_softplus()
+		inline void self_softplus()
 		{
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -26438,6 +26427,151 @@ namespace matrix
 			}
 		}
 
+		// Cast
+
+		template <typename T>
+		inline matrix<T> cast()
+		{
+			size_t cols = this->_cols;
+			size_t rows = this->_rows;
+
+			matrix<T> result(rows, cols);
+
+			double* data1 = this->_data;
+
+			T* dataResult = matrix._data;
+
+			size_t actualCols = this->actualCols;
+			size_t actualRows = this->actualRows;
+
+			if constexpr (std::is_same<T, uint8_t>::value)
+			{
+				if constexpr (thisTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[j * actualRows + j] != 0.0 ? True : False;
+						}
+					}
+				}
+				else
+				{
+					__m256d zero = _mm256_setzero_pd();
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							__m256i mask = _mm256_castpd_si256(_mm256_cmp_pd(_mm256_load_pd(&data1[i * actualCols + j]), zero, _CMP_NEQ_OQ));
+
+							__m128i mask1 = _mm256_castsi256_si128(mask);
+							__m128i mask2 = _mm256_extracti128_si256(mask, 1);
+
+							mask1 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask1), 0b01111000)), 3);
+							mask2 = _mm_srli_si128(_mm_castps_si128(_mm_permute_ps(_mm_castsi128_ps(mask2), 0b01111000)), 1);
+
+							__m128i maskResult = _mm_blend_epi16(mask1, mask2, 0b10);
+
+							_mm_store_ss(reinterpret_cast<float*>(&dataResult[i * cols + j]), _mm_castsi128_ps(maskResult));
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j] != 0.0 ? True : False;
+						}
+					}
+				}
+			}
+			else if constexpr (std::is_same<T, float>::value)
+			{
+				if constexpr (thisTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<float>(data1[j * actualRows + j]);
+						}
+					}
+				}
+				else
+				{
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							_mm_store_ps(&dataResult[i * cols + j], _mm256_cvtpd_ps(_mm256_load_pd(&data1[i * actualCols + j])));
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<float>(data1[i * actualCols + j]);
+						}
+					}
+				}
+			}
+			else if constexpr (std::is_same<T, int>::value)
+			{
+				if constexpr (thisTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<int>(data1[j * actualRows + j]);
+						}
+					}
+				}
+				else
+				{
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							_mm_store_ps(&dataResult[i * cols + j], _mm256_cvtpd_epi32(_mm256_load_pd(&data1[i * actualCols + j])));
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							double data = data1[i * actualCols + j];
+							data += 6755399441055744.0;
+							dataResult[i * cols + j] = data;
+						}
+					}
+				}
+			}
+			else
+			{
+				if constexpr (thisTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<T>(data1[j * actualRows + j]);
+						}
+					}
+				}
+				else
+				{
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<T>(data1[i * actualCols + j]);
+						}
+					}
+				}
+			}
+			return result;
+		}
+
 	private:
 		double* _data;
 		size_t _rows, _cols, _size;
@@ -26445,8 +26579,8 @@ namespace matrix
 		size_t finalPosRows, finalPosCols, finalPosSize;
 	};
 
-	template <bool thisTransposed, bool thisContiguous, bool callDestructor>
-	class matrix<uint8_t, thisTransposed, thisContiguous, callDestructor>
+	template <bool thisTransposed, bool thisContiguous, bool thisCallDestructor>
+	class matrix<uint8_t, thisTransposed, thisContiguous, thisCallDestructor>
 	{
 	public:
 		inline matrix(size_t rows, size_t cols) : 
@@ -26477,6 +26611,8 @@ namespace matrix
 			finalPosActualRows256((rows / 256) * 256),
 			finalPosActualCols256((cols / 256) * 256) {}
 
+		inline ~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
+
 		// Friend classes
 
 		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
@@ -26488,43 +26624,7 @@ namespace matrix
 		// Friend functions
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
-		{
-			size_t rows = matrix._rows;
-			size_t cols = matrix._cols;
-
-			uint8_t* data1 = matrix._data;
-
-			if constexpr (otherTransposed)
-			{
-				size_t actualRows = matrix.actualRows;
-
-				for (size_t i = 0; i < rows; i++)
-				{
-					for (size_t j = 0; j < rows; j++)
-					{
-						std::cout << (data1[j * actualRows + i] ? 1 : 0) << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			else
-			{
-				size_t actualCols = matrix.actualCols;
-
-				for (size_t i = 0; i < rows; i++)
-				{
-					for (size_t j = 0; j < rows; j++)
-					{
-						std::cout << (data1[i * actualCols + j] ? 1 : 0) << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			return os;
-		}
-
-		~matrix() { if constexpr (callDestructor) delete[] this->_data; }
+		friend std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& matrix);
 
 		inline size_t rows() { return this->_rows; };
 
@@ -26532,11 +26632,11 @@ namespace matrix
 
 		inline uint8_t* data() { return this->_data; };
 
-		inline matrix<uint8_t, thisTransposed, !thisTransposed, false> row(size_t row)
+		inline matrix<uint8_t, thisTransposed, thisContiguous, false> row(size_t row)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<uint8_t, true, false, false>(
+				return matrix<uint8_t, true, thisContiguous, false>(
 					&this->_data[row],
 					1,
 					this->_cols,
@@ -26545,7 +26645,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<uint8_t, false, true, false>(
+				return matrix<uint8_t, false, thisContiguous, false>(
 					&this->_data[row * this->actualCols],
 					1,
 					this->_cols,
@@ -26554,23 +26654,23 @@ namespace matrix
 			}
 		}
 
-		inline matrix<uint8_t, thisTransposed, thisTransposed, false> col(size_t col)
+		inline matrix<uint8_t, thisTransposed, thisContiguous, false> col(size_t col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<uint8_t, true, true, false>(
+				return matrix<uint8_t, true, thisContiguous, false>(
 					&this->_data[col * this->actualRows],
+					this->_rows,
 					1,
-					this->_cols,
 					this->actualRows,
 					this->actualCols);
 			}
 			else
 			{
-				return matrix<uint8_t, false, false, false>(
+				return matrix<uint8_t, false, thisContiguous, false>(
 					&this->_data[col],
+					this->_rows,
 					1,
-					this->_cols,
 					this->actualRows,
 					this->actualCols);
 			}
@@ -26578,30 +26678,17 @@ namespace matrix
 
 		inline matrix<uint8_t, !thisTransposed, thisContiguous, false> tranpose()
 		{
-			if constexpr (thisTransposed)
-			{
-				return matrix<uint8_t, false, thisContiguous, false>(
-					this->_data,
-					this->_rows,
-					this->_cols,
-					this->actualCols,
-					this->actualRows
-				);
-			}
-			else
-			{
-				return matrix<uint8_t, true, thisContiguous>(
-					this->_data,
-					this->_rows,
-					this->_cols,
-					this->actualRows,
-					this->actualCols
-				);
-			}
+			return matrix<uint8_t, !thisTransposed, thisContiguous, false>(
+				this->_data,
+				this->_cols,
+				this->_rows,
+				this->actualCols,
+				this->actualRows
+			);
 		}
 
 		template<bool blockContiguous = false>
-		inline matrix<uint8_t, thisTransposed, thisContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
+		inline matrix<uint8_t, thisTransposed, thisContiguous && blockContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
 		{
 			if constexpr (thisTransposed)
 			{
@@ -27466,6 +27553,102 @@ namespace matrix
 			return result;
 		}
 
+		template<typename T>
+		inline matrix<T> cast()
+		{
+			size_t cols = this->_cols;
+			size_t rows = this->_rows;
+
+			uint8_t* data1 = this->_data;
+
+			matrix<T> result(rows, cols);
+
+			T* dataResult = result._data;
+
+			if constexpr (sizeof(T) == 4)
+			{
+				if constexpr (thisTransposed)
+				{
+					uint32_t one = 0b1;
+					uint32_t zero = 0b0;
+
+					size_t actualRows = this->actualRows;
+
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[j * actualRows + i] ? reinterpret_cast<T&>(one) : reinterpret_cast<T&>(zero);
+						}
+					}
+				}
+				else
+				{
+					__m256 _one = _mm256_set1_ps(1.0f);
+					__m256 _zero = _mm256_setzero_si256();
+					uint32_t one = 0b1;
+					uint32_t zero = 0b0;
+
+					size_t actualCols = this->actualCols;
+
+					size_t finalPosCols = (this->_cols / 8) * 8;
+
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 8)
+						{
+							__m256 mask = _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i * actualCols + j])));
+
+							_mm256_store_ps(reinterpret_cast<float*>(&dataResult[i * cols + j]), _mm256_blendv_ps(_zero, _one, mask));
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j] ? reinterpret_cast<T&>(one) : reinterpret_cast<T&>(zero);
+						}
+					}
+				}
+			}
+			else if constexpr (sizeof(T) == 8)
+			{
+				if constexpr (thisTransposed)
+				{
+					uint64_t one = 0b1;
+					uint64_t zero = 0b0;
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[j * actualRows + i] ? reinterpret_cast<T&>(one) : reinterpret_cast<T&>(zero);
+						}
+					}
+				}
+				else
+				{
+					__m256d _one = _mm256_set1_pd(1.0);
+					__m256d _zero = _mm256_setzero_pd();
+					uint64_t one = 0b1;
+					uint64_t zero = 0b0;
+
+					size_t finalPosCols = (this->_cols / 4) * 4;
+
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							__m256d mask = _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_loadu_epi8(&data1[i * actualCols + j])));
+
+							_mm256_store_pd(reinterpret_cast<double*>(&dataResult[i * cols + j]), _mm256_blendv_pd(_zero, _one, mask));
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j] ? reinterpret_cast<T&>(one) : reinterpret_cast<T&>(zero);
+						}
+					}
+				}
+			}
+			return result;
+		}
+
 	private:
 
 		uint8_t* _data;
@@ -27502,7 +27685,7 @@ namespace matrix
 			finalPosCols((_cols / 8) * 8),
 			finalPosSize((_size / 8) * 8) {}
 
-		~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
 
 		// Friend classes
 
@@ -27519,42 +27702,8 @@ namespace matrix
 		friend inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
 
 		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
-		{
-			size_t rows = matrix._rows;
-			size_t cols = matrix._cols;
-
-			float* data1 = matrix._data;
-
-			if constexpr (otherTransposed)
-			{
-				size_t actualRows = matrix.actualRows;
-
-				for (size_t i = 0; i < rows; i++)
-				{
-					for (size_t j = 0; j < rows; j++)
-					{
-						std::cout << data1[j * actualRows + i] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			else
-			{
-				size_t actualCols = matrix.actualCols;
-
-				for (size_t i = 0; i < rows; i++)
-				{
-					for (size_t j = 0; j < rows; j++)
-					{
-						std::cout << data1[i * actualCols + j] << " ";
-					}
-					std::cout << std::endl;
-				}
-			}
-			return os;
-		}
-
+		friend std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& matrix);
+		
 		//----------------
 
 		inline size_t rows() { return this->_rows; }
@@ -27563,11 +27712,11 @@ namespace matrix
 
 		inline float* data() { return this->_data; }
 
-		inline matrix<float, thisTransposed, !thisTransposed, false> row(size_t row)
+		inline matrix<float, thisTransposed, thisContiguous, false> row(size_t row)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<float, true, false, false>(
+				return matrix<float, true, thisContiguous, false>(
 					&this->_data[row],
 					1,
 					this->_cols,
@@ -27576,7 +27725,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<float, false, true, false>(
+				return matrix<float, false, thisContiguous, false>(
 					&this->_data[row * this->actualCols],
 					1,
 					this->_cols,
@@ -27585,23 +27734,23 @@ namespace matrix
 			}
 		}
 
-		inline matrix<float, thisTransposed, thisTransposed, false> col(size_t col)
+		inline matrix<float, thisTransposed, thisContiguous, false> col(size_t col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<float, true, true, false>(
+				return matrix<float, true, thisContiguous, false>(
 					&this->_data[col * this->actualRows],
+					this->_rows,
 					1,
-					this->_cols,
 					this->actualRows,
 					this->actualCols);
 			}
 			else
 			{
-				return matrix<float, false, false, false>(
+				return matrix<float, false, thisContiguous, false>(
 					&this->_data[col],
+					this->_rows,
 					1,
-					this->_cols,
 					this->actualRows,
 					this->actualCols);
 			}
@@ -27609,30 +27758,17 @@ namespace matrix
 
 		inline matrix<float, !thisTransposed, thisContiguous, false> tranpose()
 		{
-			if constexpr (thisTransposed)
-			{
-				return matrix<float, false, thisContiguous, false>(
-					this->_data,
-					this->_rows,
-					this->_cols,
-					this->actualCols,
-					this->actualRows
-				);
-			}
-			else
-			{
-				return matrix<float, true, thisContiguous, false>(
-					this->_data,
-					this->_rows,
-					this->_cols,
-					this->actualRows,
-					this->actualCols
-				);
-			}
+			return matrix<float, !thisTransposed, thisContiguous, false>(
+				this->_data,
+				this->_cols,
+				this->_rows,
+				this->actualCols,
+				this->actualRows
+			);
 		}
 
 		template<bool blockContiguous = false>
-		inline matrix<float, thisTransposed, thisContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
+		inline matrix<float, thisTransposed, thisContiguous && blockContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
 		{
 			if constexpr (thisTransposed)
 			{
@@ -27695,7 +27831,7 @@ namespace matrix
 
 				for (size_t i = 0; i < rows; i++)
 				{
-					for (size_t j = 0; j < rows; j++)
+					for (size_t j = 0; j < cols; j++)
 					{
 						if (i == j)
 						{
@@ -27714,7 +27850,7 @@ namespace matrix
 
 				for (size_t i = 0; i < rows; i++)
 				{
-					for (size_t j = 0; j < rows; j++)
+					for (size_t j = 0; j < cols; j++)
 					{
 						if (i == j)
 						{
@@ -28487,7 +28623,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 8)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256 a = _mm256_setr_ps(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -29231,7 +29367,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 8)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256 a = _mm256_setr_ps(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -29975,7 +30111,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 8)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256 a = _mm256_setr_ps(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -30719,7 +30855,7 @@ namespace matrix
 
 					for (size_t i = 0; i < finalPosRows; i += 8)
 					{
-						for (size_t j = 0; j < rows; j++)
+						for (size_t j = 0; j < cols; j++)
 						{
 							__m256 a = _mm256_setr_ps(data1[i * matrix1ActualCols + j],
 								data1[(i + 1) * matrix1ActualCols + j],
@@ -40204,12 +40340,6 @@ namespace matrix
 			return result;
 		}
 
-		// Dot
-
-		template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
-			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-		inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
-
 		// Activation functions
 
 		// ReLU
@@ -41279,6 +41409,162 @@ namespace matrix
 					}
 				}
 			}
+		}
+
+		// Cast
+		template<typename T>
+		inline matrix<T> cast()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			float* data1 = this->_data;
+
+			matrix<T> result(rows, cols);
+
+			T* dataResult = result._data;
+
+			if constexpr (std::is_same<T, int>)
+			{
+				if constexpr (thisTransposed)
+				{
+					size_t actualRows = this->actualRows;
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<int>(data1[j * actualRows + i]);
+						}
+					}
+				}
+				else
+				{
+					size_t actualCols = this->actualCols;
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t j = 0; j < finalPosCols; j += 8)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							_mm256_storeu_epi32(&dataResult[i * cols + j], _mm256_cvtps_epi32(_mm256_load_ps(&data1[i * actualCols + j])));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							dataResult[i * cols + j] = static_cast<int>(data1[i * actualCols + j]);
+						}
+					}
+				}
+			}
+			else if constexpr (std::is_same<T, double>)
+			{
+				if constexpr (thisTransposed)
+				{
+					size_t actualRows = this->actualRows;
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<double>(data1[j * actualRows + i]);
+						}
+					}
+				}
+				else
+				{
+					size_t actualCols = this->actualCols;
+					size_t finalPosCols = (cols / 4) * 4;
+
+					for (size_t j = 0; j < finalPosCols; j += 4)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							_mm256_store_pd(&dataResult[i * cols + j], _mm256_cvtps_pd(_mm_load_ps(&data1[i * actualCols + j])));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							dataResult[i * cols + j] = static_cast<double>(data1[i * actualCols + j]);
+						}
+					}
+				}
+			}
+			else if constexpr (std::is_same<T, uint8_t>)
+			{
+				if constexpr (thisTransposed)
+				{
+					size_t actualRows = this->actualRows;
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[j * actualRows + i] ? True : False;
+						}
+					}
+				}
+				else
+				{
+					size_t actualCols = this->actualCols;
+					size_t finalPosCols = this->finalPosCols;
+
+					__m256 b = _mm256_setzero_ps();
+
+					__m256i indices = _mm256_setr_epi32(0, 7, 2, 3, 4, 5, 6, 1);
+
+					for (size_t j = 0; j < finalPosCols; j += 8)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256 a = _mm256_load_ps(&data1[i * actualCols + j]);
+
+							__m256i mask = _mm256_castps_si256(_mm256_cmp_ps(a, b, _CMP_NEQ_OQ));
+							__m256i mask1 = _mm256_packs_epi32(mask, mask);
+							__m256i mask2 = _mm256_packs_epi16(mask1, mask1);
+
+							mask2 = _mm256_permutevar8x32_epi32(mask2, indices);
+
+							_mm_store_sd(reinterpret_cast<double*>(&dataResult[i * cols + j]), _mm_castsi128_pd(_mm256_castsi256_si128(mask2)));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j] ? True : False;
+						}
+					}
+				}
+			}
+			else
+			{
+				if constexpr (thisTransposed)
+				{
+					size_t actualRows = this->actualRows;
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<T>(data1[j * actualRows + i]);
+						}
+					}
+				}
+				else
+				{
+					size_t actualCols = this->actualCols;
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = static_cast<T>(data1[i * actualCols + j]);
+						}
+					}
+				}
+				
+			}
+			return result;
 		}
 
 	private:
@@ -42437,6 +42723,169 @@ namespace matrix
 		return result;
 	}
 	
+
+	// Cout
+
+	template<bool otherCallDestructor>
+	std::ostream& operator<<(std::ostream& os, const vector<double, otherCallDestructor>& vector)
+	{
+		for (size_t i = 0; i < vector._size; i++)
+		{
+			std::cout << vector._data[i] << std::endl;
+		}
+		return os;
+	}
+
+	template<bool otherCallDestructor>
+	std::ostream& operator<<(std::ostream& os, const vector<uint64_t, otherCallDestructor>& vector)
+	{
+		for (size_t i = 0; i < vector._size; i++)
+		{
+			std::cout << vector._data[i] << std::endl;
+		}
+		return os;
+	}
+
+	template<bool otherCallDestructor>
+	std::ostream& operator<<(std::ostream& os, const vector<uint8_t, otherCallDestructor>& vector)
+	{
+		for (size_t i = 0; i < vector._size; i++)
+		{
+			std::cout << (vector._data[i] ? 1 : 0) << std::endl;
+		}
+		return os;
+	}
+
+	template<bool otherCallDestructor>
+	std::ostream& operator<<(std::ostream& os, const vector<float, otherCallDestructor>& vector)
+	{
+		for (size_t i = 0; i < vector._size; i++)
+		{
+			std::cout << vector._data[i] << std::endl;
+		}
+		return os;
+	}
+
+	template<bool otherCallDestructor>
+	std::ostream& operator<<(std::ostream& os, const vector<int, otherCallDestructor>& vector)
+	{
+		for (size_t i = 0; i < vector._size; i++)
+		{
+			std::cout << vector._data[i] << std::endl;
+		}
+		return os;
+	}
+
+	template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
+	std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+	{
+		size_t rows = matrix._rows;
+		size_t cols = matrix._cols;
+
+		double* data1 = matrix._data;
+
+		if constexpr (otherTransposed)
+		{
+			size_t actualRows = matrix.actualRows;
+
+			for (size_t i = 0; i < rows; i++)
+			{
+				for (size_t j = 0; j < cols; j++)
+				{
+					std::cout << data1[j * actualRows + i] << " ";
+				}
+				std::cout << std::endl;
+			}
+		}
+		else
+		{
+			size_t actualCols = matrix.actualCols;
+
+			for (size_t i = 0; i < rows; i++)
+			{
+				for (size_t j = 0; j < cols; j++)
+				{
+					std::cout << data1[i * actualCols + j] << " ";
+				}
+				std::cout << std::endl;
+			}
+		}
+		return os;
+	}
+
+	template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
+	std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+	{
+		size_t rows = matrix._rows;
+		size_t cols = matrix._cols;
+
+		float* data1 = matrix._data;
+
+		if constexpr (otherTransposed)
+		{
+			size_t actualRows = matrix.actualRows;
+
+			for (size_t i = 0; i < rows; i++)
+			{
+				for (size_t j = 0; j < cols; j++)
+				{
+					std::cout << data1[j * actualRows + i] << " ";
+				}
+				std::cout << std::endl;
+			}
+		}
+		else
+		{
+			size_t actualCols = matrix.actualCols;
+
+			for (size_t i = 0; i < rows; i++)
+			{
+				for (size_t j = 0; j < cols; j++)
+				{
+					std::cout << data1[i * actualCols + j] << " ";
+				}
+				std::cout << std::endl;
+			}
+		}
+		return os;
+	}
+
+	template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
+	std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+	{
+		size_t rows = matrix._rows;
+		size_t cols = matrix._cols;
+
+		uint8_t* data1 = matrix._data;
+
+		if constexpr (otherTransposed)
+		{
+			size_t actualRows = matrix.actualRows;
+
+			for (size_t i = 0; i < rows; i++)
+			{
+				for (size_t j = 0; j < cols; j++)
+				{
+					std::cout << (data1[j * actualRows + i] ? 1 : 0) << " ";
+				}
+				std::cout << std::endl;
+			}
+		}
+		else
+		{
+			size_t actualCols = matrix.actualCols;
+
+			for (size_t i = 0; i < rows; i++)
+			{
+				for (size_t j = 0; j < cols; j++)
+				{
+					std::cout << (data1[i * actualCols + j] ? 1 : 0) << " ";
+				}
+				std::cout << std::endl;
+			}
+		}
+		return os;
+	}
 
 	//---------------------------------------------------------------------------
 
