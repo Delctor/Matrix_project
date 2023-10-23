@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 #include <immintrin.h>
 
 #define uint32_to_float(v) __m256i v2 = _mm256_srli_epi32(v, 1); \
@@ -46,7 +47,7 @@
 
 namespace matrix
 {
-	template <typename T, bool otherCallDestructor = true>
+	template <typename T>
 	class vector 
 	{
 		static_assert(std::is_same<T, double>::value || 
@@ -59,7 +60,7 @@ namespace matrix
 			"The data type only can be double, float, int, uint64_t or int64_t or uint8_t");
 	};
 	
-	template <typename T, bool tranposed = false, bool contiguous = true, bool otherCallDestructor = true>
+	template <typename T, bool tranposed = false, bool contiguous = true>
 	class matrix
 	{
 		static_assert(std::is_same<T, double>::value ||
@@ -86,40 +87,35 @@ namespace matrix
 		__seeds__ = _mm256_loadu_epi64(seeds);
 	}
 
-	template <bool thisCallDestructor>
-	class vector<uint8_t, thisCallDestructor>
+	template <>
+	class vector<uint8_t>
 	{
 	public:
-		inline vector(size_t size) : _data(new uint8_t[size]), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
+		inline vector(size_t size) : _data(new uint8_t[size]), dataToDelete(_data), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
 
-		inline vector(uint8_t* data, size_t size) : _data(data), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
+		inline vector(uint8_t* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
 
-		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~vector() { delete[] this->dataToDelete; }
 
 		// Friend classes
 
-		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		template <typename T, bool tranposed, bool contiguous>
 		friend class matrix;
 
-		template <typename T, bool otherCallDestructor>
+		template <typename T>
 		friend class vector;
 
 		// Friend functions
 
-		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
-		friend inline vector<double> where(vector<uint8_t, callDestructor1>&, vector<double, callDestructor2>&, vector<double, callDestructor3>&);
+		friend inline vector<double> where(vector<uint8_t>&, vector<double>&, vector<double>&);
 
-		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
-		friend inline vector<float> where(vector<uint8_t, callDestructor1>&, vector<float, callDestructor2>&, vector<float, callDestructor3>&);
+		friend inline vector<float> where(vector<uint8_t>&, vector<float>&, vector<float>&);
 
-		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
-		friend inline vector<uint64_t> where(vector<uint8_t, callDestructor1>&, vector<uint64_t, callDestructor2>&, vector<uint64_t, callDestructor3>&);
+		friend inline vector<uint64_t> where(vector<uint8_t>&, vector<uint64_t>&, vector<uint64_t>&);
 
-		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
-		friend inline vector<int> where(vector<uint8_t, callDestructor1>&, vector<int, callDestructor2>&, vector<int, callDestructor3>&);
+		friend inline vector<int> where(vector<uint8_t>&, vector<int>&, vector<int>&);
 
-		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<uint8_t, otherCallDestructor>& vector);
+		friend std::ostream& operator<<(std::ostream& os, const vector<uint8_t>& vector);
 
 		inline uint8_t* data() { return this->_data; }
 
@@ -137,18 +133,66 @@ namespace matrix
 			return data[index];
 		}
 
-		inline vector<uint8_t, thisCallDestructor> block(size_t initial, size_t final)
+		inline vector<uint8_t> block(size_t initial, size_t final)
 		{
-			return vector<uint8_t, thisCallDestructor>(
+			return vector<uint8_t>(
 				&this->_data[initial],
 				final - initial
 			);
 		}
 
+		// Copy
+
+		inline vector<uint8_t> copy()
+		{
+			size_t size = this->_size;
+
+			vector<uint8_t> result(size);
+
+			uint8_t* data1 = this->_data;
+
+			uint8_t* dataResult = result._data;
+
+			for (size_t i = 0; i < size; i++)
+			{
+				dataResult[i] = data1[i];
+			}
+			return result;
+		}
+
+		// =
+
+		inline vector<uint8_t>& operator=(vector<uint8_t>& other)
+		{
+			if (this->_data == nullptr)
+			{
+				this->_data = other._data;
+				other.dataToDelete = nullptr;
+				this->dataToDelete = this->_data;
+				this->_size = other._size;
+				this->finalPos = other.finalPos;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+				size_t size = this->_size;
+				uint8_t* data1 = this->_data;
+				uint8_t* data2 = other._data;
+
+				for (size_t i = 0; i < size; i++)
+				{
+					data1[i] = data2[i];
+				}
+			}
+			return *this;
+		}
+
 		// &&
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator&&(vector<uint8_t, otherCallDestructor>& other)
+		inline vector<uint8_t> operator&&(vector<uint8_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -208,8 +252,7 @@ namespace matrix
 
 		// ||
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator||(vector<uint8_t, otherCallDestructor>& other)
+		inline vector<uint8_t> operator||(vector<uint8_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -424,35 +467,34 @@ namespace matrix
 
 	private:
 		uint8_t* _data;
+		uint8_t* dataToDelete;
 		size_t _size;
 		size_t finalPos, finalPos256;
 	};
 
-	template <bool thisCallDestructor>
-	class vector<uint64_t, thisCallDestructor>
+	template <>
+	class vector<uint64_t>
 	{
 	public:
-		inline vector(size_t size) : _data(new uint64_t[size]), _size(size), finalPos((size / 4) * 4) {}
+		inline vector(size_t size) : _data(new uint64_t[size]), dataToDelete(_data), _size(size), finalPos((size / 4) * 4) {}
 
-		inline vector(uint64_t* data, size_t size) : _data(data), _size(size), finalPos((size / 4) * 4) {}
+		inline vector(uint64_t* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 4) * 4) {}
 
-		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~vector() { delete[] this->dataToDelete; }
 
 		// Friend classes
 
-		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		template <typename T, bool tranposed, bool contiguous>
 		friend class matrix;
 
-		template <typename T, bool otherCallDestructor>
+		template <typename T>
 		friend class vector;
 
 		// Friend functions
 
-		template<bool callDestructor1, bool callDestructor2, bool callDestructor3>
-		friend inline vector<uint64_t> where(vector<uint8_t, callDestructor1>&, vector<uint64_t, callDestructor2>&, vector<uint64_t, callDestructor3>&);
+		friend inline vector<uint64_t> where(vector<uint8_t>&, vector<uint64_t>&, vector<uint64_t>&);
 
-		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<uint64_t, otherCallDestructor>& vector);
+		friend std::ostream& operator<<(std::ostream& os, const vector<uint64_t>& vector);
 
 		inline uint64_t* data() { return this->_data; }
 
@@ -472,12 +514,61 @@ namespace matrix
 
 		// Block
 
-		inline vector<uint64_t, thisCallDestructor> block(size_t initial, size_t final)
+		inline vector<uint64_t> block(size_t initial, size_t final)
 		{
-			return vector<uint64_t, thisCallDestructor>(
+			return vector<uint64_t>(
 				&this->_data[initial],
 				final - initial
 			);
+		}
+
+		// Copy
+
+		inline vector<uint64_t> copy()
+		{
+			size_t size = this->_size;
+
+			vector<uint64_t> result(size);
+
+			uint64_t* data1 = this->_data;
+
+			uint64_t* dataResult = result._data;
+
+			for (size_t i = 0; i < size; i++)
+			{
+				dataResult[i] = data1[i];
+			}
+			return result;
+		}
+
+		// = 
+
+		inline vector<uint64_t>& operator=(vector<uint64_t>& other)
+		{
+			if (this->_data == nullptr)
+			{
+				this->_data = other._data;
+				other.dataToDelete = nullptr;
+				this->dataToDelete = this->_data;
+				this->_size = other._size;
+				this->finalPos = other.finalPos;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+				size_t size = this->_size;
+				uint64_t* data1 = this->_data;
+				uint64_t* data2 = other._data;
+
+				for (size_t i = 0; i < size; i++)
+				{
+					data1[i] = data2[i];
+				}
+			}
+			return *this;
 		}
 
 		// Set Constant
@@ -498,8 +589,7 @@ namespace matrix
 
 		// +
 
-		template <bool otherCallDestructor>
-		inline vector<uint64_t> operator+(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint64_t> operator+(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -557,8 +647,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator+=(vector<uint64_t, otherCallDestructor>& other)
+		inline void operator+=(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -608,8 +697,7 @@ namespace matrix
 
 		// -
 
-		template <bool otherCallDestructor>
-		inline vector<uint64_t> operator-(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint64_t> operator-(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -667,8 +755,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator-=(vector<uint64_t, otherCallDestructor>& other)
+		inline void operator-=(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -718,8 +805,7 @@ namespace matrix
 
 		// *
 
-		template <bool otherCallDestructor>
-		inline vector<uint64_t> operator*(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint64_t> operator*(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -777,8 +863,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator*=(vector<uint64_t, otherCallDestructor>& other)
+		inline void operator*=(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -828,8 +913,7 @@ namespace matrix
 
 		// /
 
-		template <bool otherCallDestructor>
-		inline vector<uint64_t> operator/(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint64_t> operator/(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -887,8 +971,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator/=(vector<uint64_t, otherCallDestructor>& other)
+		inline void operator/=(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -938,8 +1021,7 @@ namespace matrix
 
 		// ==
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator==(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint8_t> operator==(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -1019,8 +1101,7 @@ namespace matrix
 
 		// !=
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator!=(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint8_t> operator!=(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -1102,8 +1183,7 @@ namespace matrix
 
 		// >
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator>(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint8_t> operator>(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -1181,8 +1261,7 @@ namespace matrix
 
 		// < 
 		
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator<(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint8_t> operator<(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -1271,8 +1350,7 @@ namespace matrix
 
 		// >=
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator>=(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint8_t> operator>=(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -1356,8 +1434,7 @@ namespace matrix
 
 		// <=
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator<=(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint8_t> operator<=(vector<uint64_t>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -1486,8 +1563,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline vector<uint64_t> pow(vector<uint64_t, otherCallDestructor>& other)
+		inline vector<uint64_t> pow(vector<uint64_t>& other)
 		{
 			size_t size = this->_size;
 
@@ -1576,8 +1652,7 @@ namespace matrix
 			}
 		}
 
-		template <bool otherCallDestructor>
-		inline void self_pow(vector<uint64_t, otherCallDestructor>& other)
+		inline void self_pow(vector<uint64_t>& other)
 		{
 			size_t size = this->_size;
 
@@ -1646,8 +1721,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline vector<uint64_t> operator<<(vector<uint64_t, otherCallDestructor> other)
+		inline vector<uint64_t> operator<<(vector<uint64_t> other)
 		{
 			size_t size = this->_size;
 
@@ -1689,8 +1763,7 @@ namespace matrix
 			}
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator<<=(vector<uint64_t, otherCallDestructor> other)
+		inline void operator<<=(vector<uint64_t> other)
 		{
 			size_t size = this->_size;
 
@@ -1734,8 +1807,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline vector<uint64_t> operator>>(vector<uint64_t, otherCallDestructor> other)
+		inline vector<uint64_t> operator>>(vector<uint64_t> other)
 		{
 			size_t size = this->_size;
 
@@ -1777,8 +1849,7 @@ namespace matrix
 			}
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator>>=(vector<uint64_t, otherCallDestructor> other)
+		inline void operator>>=(vector<uint64_t> other)
 		{
 			size_t size = this->_size;
 
@@ -1795,6 +1866,11 @@ namespace matrix
 			{
 				data1[i] >>= data2[i];
 			}
+		}
+
+		inline void sort()
+		{
+			std::sort(this->_data, this->_data + this->_size);
 		}
 
 		// Cast
@@ -1865,38 +1941,38 @@ namespace matrix
 
 	private:
 		uint64_t* _data;
+		uint64_t* dataToDelete;
 		size_t _size;
 		size_t finalPos;
 	};
 
-	template <bool thisCallDestructor>
-	class vector<double, thisCallDestructor>
+	template <>
+	class vector<double>
 	{
 	public:
-		inline vector(size_t size) : _data(new double[size]), _size(size), finalPos((size / 4) * 4) {}
+		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
 
-		inline vector(double* data, size_t size) : _data(data), _size(size), finalPos((size / 4) * 4) {}
+		inline vector(size_t size) : _data(new double[size]), dataToDelete(_data), _size(size), finalPos((size / 4) * 4) {}
 
-		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline vector(double* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 4) * 4) {}
+
+		inline ~vector() { delete[] this->dataToDelete; }
 
 		// Friend class
 
-		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		template <typename T, bool tranposed, bool contiguous>
 		friend class matrix;
 
-		template <typename T, bool otherCallDestructor>
+		template <typename T>
 		friend class vector;
 
 		// Friend function
 
-		template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
-		friend inline vector<double> where(vector<uint8_t, callDestructor1>&, vector<double, callDestructor2>&, vector<double, callDestructor3>&);
+		friend inline vector<double> where(vector<uint8_t>&, vector<double>&, vector<double>&);
 
-		template <bool callDestructor1, bool callDestructor2>
-		friend inline double dot(vector<double, callDestructor1>&, vector<double, callDestructor2>&);
+		friend inline double dot(vector<double>&, vector<double>&);
 
-		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<double, otherCallDestructor>& vector);
+		friend std::ostream& operator<<(std::ostream& os, const vector<double>& vector);
 
 		inline double& operator[](size_t index)
 		{
@@ -1914,14 +1990,63 @@ namespace matrix
 
 		// Block
 
-		inline vector<double, thisCallDestructor> block(size_t initial, size_t final)
+		inline vector<double> block(size_t initial, size_t final)
 		{
-			return vector<double, thisCallDestructor>(
+			return vector<double>(
 				&this->_data[initial],
 				final - initial
 			);
 		}
 
+		// Copy
+
+		inline vector<double> copy()
+		{
+			size_t size = this->_size;
+
+			vector<double> result;
+
+			double* data1 = this->_data;
+
+			double* dataResult = result._data;
+
+			for (size_t i = 0; i < size; i++)
+			{
+				dataResult[i] = data1[i];
+			}
+			return result;
+		}
+
+		// =
+
+		inline vector<double>& operator=(vector<double>& other)
+		{
+			if (this->_data == nullptr)
+			{
+				this->_data = other._data;
+				other.dataToDelete = nullptr;
+				this->dataToDelete = this->_data;
+				this->_size = other._size;
+				this->finalPos = other.finalPos;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+				size_t size = this->_size;
+				double* data1 = this->_data;
+				double* data2 = other._data;
+
+				for (size_t i = 0; i < size; i++)
+				{
+					data1[i] = data2[i];
+				}
+			}
+			return *this;
+		}
+	
 		// Set Constant
 
 		inline void set_const(double num)
@@ -1992,8 +2117,8 @@ namespace matrix
 
 		// +
 
-		template<bool otherCallDestructor>
-		inline vector<double> operator+(vector<double, otherCallDestructor>& other)
+		
+		inline vector<double> operator+(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2053,8 +2178,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline void operator+=(vector<double, otherCallDestructor>& other)
+		
+		inline void operator+=(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2106,8 +2231,8 @@ namespace matrix
 
 		// -
 
-		template<bool otherCallDestructor>
-		inline vector<double> operator-(vector<double, otherCallDestructor>& other)
+		
+		inline vector<double> operator-(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2167,8 +2292,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline void operator-=(vector<double, otherCallDestructor>& other)
+		
+		inline void operator-=(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2220,8 +2345,8 @@ namespace matrix
 
 		// *
 
-		template<bool otherCallDestructor>
-		inline vector<double> operator*(vector<double, otherCallDestructor>& other)
+		
+		inline vector<double> operator*(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2281,8 +2406,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline void operator*=(vector<double, otherCallDestructor>& other)
+		
+		inline void operator*=(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2334,8 +2459,8 @@ namespace matrix
 
 		// /
 
-		template<bool otherCallDestructor>
-		inline vector<double> operator/(vector<double, otherCallDestructor>& other)
+		
+		inline vector<double> operator/(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2395,8 +2520,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline void operator/=(vector<double, otherCallDestructor>& other)
+		
+		inline void operator/=(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2448,8 +2573,7 @@ namespace matrix
 
 		// ==
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator==(vector<double, otherCallDestructor>& other)
+		inline vector<uint8_t> operator==(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2529,8 +2653,7 @@ namespace matrix
 
 		// !=
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator!=(vector<double, otherCallDestructor>& other)
+		inline vector<uint8_t> operator!=(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2610,8 +2733,7 @@ namespace matrix
 
 		// >
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator>(vector<double, otherCallDestructor>& other)
+		inline vector<uint8_t> operator>(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size > other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2691,8 +2813,8 @@ namespace matrix
 
 		// >=
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator>=(vector<double, otherCallDestructor>& other)
+		
+		inline vector<uint8_t> operator>=(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2770,8 +2892,8 @@ namespace matrix
 
 		// <
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator<(vector<double, otherCallDestructor>& other)
+		
+		inline vector<uint8_t> operator<(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2849,8 +2971,8 @@ namespace matrix
 
 		// <=
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator<=(vector<double, otherCallDestructor>& other)
+		
+		inline vector<uint8_t> operator<=(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -2955,8 +3077,7 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline vector<double> pow(vector<double, otherCallDestructor>& other)
+		inline vector<double> pow(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -3005,8 +3126,7 @@ namespace matrix
 			}
 		}
 
-		template<bool otherCallDestructor>
-		inline void self_pow(vector<double, otherCallDestructor>& other)
+		inline void self_pow(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -3059,8 +3179,7 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline vector<double> root(vector<double, otherCallDestructor>& other)
+		inline vector<double> root(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -3113,8 +3232,7 @@ namespace matrix
 			}
 		}
 
-		template<bool otherCallDestructor>
-		inline void self_root(vector<double, otherCallDestructor>& other)
+		inline void self_root(vector<double>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4317,7 +4435,7 @@ namespace matrix
 
 		inline void sort() 
 		{
-			//std::stable_sort(this->_data, this->_data + this->_size, std::greater<double>());
+			std::sort(this->_data, this->_data + this->_size);
 		}
 
 		template <typename T>
@@ -4392,34 +4510,32 @@ namespace matrix
 
 	private:
 		double* _data;
+		double* dataToDelete;
 		size_t _size;
 		size_t finalPos;
 	};
 
-	template <bool thisCallDestructor>
-	class vector<float, thisCallDestructor>
+	template <>
+	class vector<float>
 	{
 	public:
-		inline vector(size_t size) : _data(new float[size]), _size(size), finalPos((size / 8) * 8) {}
+		inline vector(size_t size) : _data(new float[size]), dataToDelete(_data), _size(size), finalPos((size / 8) * 8) {}
 
-		inline vector(float* data, size_t size) : _data(data), _size(size), finalPos((size / 8) * 8) {}
+		inline vector(float* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 8) * 8) {}
 
-		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~vector() { delete[] this->dataToDelete; }
 
-		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		template <typename T, bool tranposed, bool contiguous>
 		friend class matrix;
 
-		template <typename T, bool otherCallDestructor>
+		template <typename T>
 		friend class vector;
 
-		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<float, otherCallDestructor>& vector);
+		friend std::ostream& operator<<(std::ostream& os, const vector<float>& vector);
 
-		template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
-		friend inline vector<float> where(vector<uint8_t, callDestructor1>&, vector<float, callDestructor2>&, vector<float, callDestructor3>&);
+		friend inline vector<float> where(vector<uint8_t>&, vector<float>&, vector<float>&);
 
-		template <bool callDestructor1, bool callDestructor2>
-		friend inline float dot(vector<float, callDestructor1>&, vector<float, callDestructor2>&);
+		friend inline float dot(vector<float>&, vector<float>&);
 
 		inline float& operator[](size_t index)
 		{
@@ -4437,12 +4553,61 @@ namespace matrix
 
 		// Block
 
-		inline vector<float, thisCallDestructor> block(size_t initial, size_t final)
+		inline vector<float> block(size_t initial, size_t final)
 		{
-			return vector<float, thisCallDestructor>(
+			return vector<float>(
 				&this->_data[initial],
 				final - initial
 			);
+		}
+
+		// Copy
+
+		inline vector<float> copy()
+		{
+			size_t size = this->_size;
+
+			vector<float> result(size);
+
+			float* data1 = this->_data;
+
+			float* dataResult = result._data;
+
+			for (size_t i = 0; i < size; i++)
+			{
+				dataResult[i] = data1[i];
+			}
+			return result;
+		}
+
+		// =
+
+		inline vector<float>& operator=(vector<float>& other)
+		{
+			if (this->_data == nullptr)
+			{
+				this->_data = other._data;
+				other.dataToDelete = nullptr;
+				this->dataToDelete = this->_data;
+				this->_size = other._size;
+				this->finalPos = other.finalPos;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+				size_t size = this->_size;
+				float* data1 = this->_data;
+				float* data2 = other._data;
+
+				for (size_t i = 0; i < size; i++)
+				{
+					data1[i] = data2[i];
+				}
+			}
+			return *this;
 		}
 
 		// Set Constant
@@ -4511,8 +4676,7 @@ namespace matrix
 
 		// +
 
-		template <bool otherCallDestructor>
-		inline vector<float> operator+(vector<float, otherCallDestructor>& other)
+		inline vector<float> operator+(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4570,8 +4734,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator+=(vector<float, otherCallDestructor>& other)
+		inline void operator+=(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4621,8 +4784,7 @@ namespace matrix
 
 		// -
 
-		template <bool otherCallDestructor>
-		inline vector<float> operator-(vector<float, otherCallDestructor>& other)
+		inline vector<float> operator-(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4680,8 +4842,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator-=(vector<float, otherCallDestructor>& other)
+		inline void operator-=(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4731,8 +4892,7 @@ namespace matrix
 
 		// *
 
-		template <bool otherCallDestructor>
-		inline vector<float> operator*(vector<float, otherCallDestructor>& other)
+		inline vector<float> operator*(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4790,8 +4950,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator*=(vector<float, otherCallDestructor>& other)
+		inline void operator*=(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4841,8 +5000,7 @@ namespace matrix
 
 		// /
 
-		template <bool otherCallDestructor>
-		inline vector<float> operator/(vector<float, otherCallDestructor>& other)
+		inline vector<float> operator/(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4900,8 +5058,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline void operator/=(vector<float, otherCallDestructor>& other)
+		inline void operator/=(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -4951,8 +5108,7 @@ namespace matrix
 
 		// ==
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator==(vector<float, otherCallDestructor>& other)
+		inline vector<uint8_t> operator==(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5028,8 +5184,7 @@ namespace matrix
 
 		// !=
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator!=(vector<float, otherCallDestructor>& other)
+		inline vector<uint8_t> operator!=(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5105,8 +5260,7 @@ namespace matrix
 
 		// >
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator>(vector<float, otherCallDestructor>& other)
+		inline vector<uint8_t> operator>(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5184,8 +5338,7 @@ namespace matrix
 
 		// >=
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator>=(vector<float, otherCallDestructor>& other)
+		inline vector<uint8_t> operator>=(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5263,8 +5416,7 @@ namespace matrix
 
 		// <
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator<(vector<float, otherCallDestructor>& other)
+		inline vector<uint8_t> operator<(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5342,8 +5494,7 @@ namespace matrix
 
 		// <=
 
-		template <bool otherCallDestructor>
-		inline vector<uint8_t> operator<=(vector<float, otherCallDestructor>& other)
+		inline vector<uint8_t> operator<=(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5448,8 +5599,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline vector<float> pow(vector<float, otherCallDestructor>& other)
+		inline vector<float> pow(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5498,8 +5648,7 @@ namespace matrix
 			}
 		}
 
-		template <bool otherCallDestructor>
-		inline void self_pow(vector<float, otherCallDestructor>& other)
+		inline void self_pow(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5552,8 +5701,7 @@ namespace matrix
 			return result;
 		}
 
-		template <bool otherCallDestructor>
-		inline vector<float> root(vector<float, otherCallDestructor>& other)
+		inline vector<float> root(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -5606,8 +5754,7 @@ namespace matrix
 			}
 		}
 
-		template <bool otherCallDestructor>
-		inline void self_root(vector<float, otherCallDestructor>& other)
+		inline void self_root(vector<float>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -6828,6 +6975,11 @@ namespace matrix
 			return exp / exp.sum();
 		}
 
+		inline void sort()
+		{
+			std::sort(this->_data, this->_data + this->_size);
+		}
+
 		template <typename T>
 		inline vector<T> cast()
 		{
@@ -6896,36 +7048,35 @@ namespace matrix
 
 	private:
 		float* _data;
+		float* dataToDelete;
 		size_t _size;
 		size_t finalPos;
 	};
 
-	template <bool thisCallDestructor>
-	class vector<int, thisCallDestructor>
+	template <>
+	class vector<int>
 	{
 	public:
 
-		inline vector(size_t size) : _data(new int[size]), _size(size), finalPos((size / 8) * 8) {}
+		inline vector(size_t size) : _data(new int[size]), dataToDelete(_data), _size(size), finalPos((size / 8) * 8) {}
 
-		inline vector(int* data, size_t size) : _data(data), _size(size), finalPos((size / 8) * 8) {}
+		inline vector(int* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 8) * 8) {}
 
-		inline ~vector() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~vector() { delete[] this->dataToDelete; }
 
 		// Friend classes
 
-		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		template <typename T, bool tranposed, bool contiguous>
 		friend class matrix;
 
-		template <typename T, bool otherCallDestructor>
+		template <typename T>
 		friend class vector;
 
 		// Friend functions
 
-		template<bool otherCallDestructor1, bool otherCallDestructor2, bool otherCallDestructor3>
-		friend inline vector<int> where(vector<uint8_t, otherCallDestructor1>&, vector<int, otherCallDestructor2>&, vector<int, otherCallDestructor3>&);
+		friend inline vector<int> where(vector<uint8_t>&, vector<int>&, vector<int>&);
 
-		template<bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const vector<int, otherCallDestructor>& vector);
+		friend std::ostream& operator<<(std::ostream& os, const vector<int>& vector);
 
 		// -----
 
@@ -6947,12 +7098,61 @@ namespace matrix
 
 		// Block
 
-		inline vector<int, thisCallDestructor> block(size_t initial, size_t final)
+		inline vector<int> block(size_t initial, size_t final)
 		{
-			return vector<int, thisCallDestructor>(
+			return vector<int>(
 				&this->_data[initial],
 				final - initial
 			);
+		}
+
+		// Copy
+
+		inline vector<int> copy()
+		{
+			size_t size = this->_size;
+
+			vector<int> result(size);
+
+			int* data1 = this->_data;
+
+			int* dataResult = result._data;
+
+			for (size_t i = 0; i < size; i++)
+			{
+				dataResult[i] = data1[i];
+			}
+			return result;
+		}
+
+		// =
+
+		inline vector<int>& operator=(vector<int>& other)
+		{
+			if (this->_data == nullptr)
+			{
+				this->_data = other._data;
+				other.dataToDelete = nullptr;
+				this->dataToDelete = this->_data;
+				this->_size = other._size;
+				this->finalPos = other.finalPos;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
+#else
+#endif
+				size_t size = this->_size;
+				int* data1 = this->_data;
+				int* data2 = other._data;
+
+				for (size_t i = 0; i < size; i++)
+				{
+					data1[i] = data2[i];
+				}
+			}
+			return *this;
 		}
 
 		// Set Constant
@@ -6973,8 +7173,7 @@ namespace matrix
 
 		// +
 
-		template<bool otherCallDestructor>
-		inline vector<int> operator+(vector<int, otherCallDestructor>& other)
+		inline vector<int> operator+(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7032,8 +7231,7 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline void operator+=(vector<int, otherCallDestructor>& other)
+		inline void operator+=(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7083,8 +7281,7 @@ namespace matrix
 
 		// -
 
-		template<bool otherCallDestructor>
-		inline vector<int> operator-(vector<int, otherCallDestructor>& other)
+		inline vector<int> operator-(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7142,8 +7339,7 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline void operator-=(vector<int, otherCallDestructor>& other)
+		inline void operator-=(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7193,8 +7389,7 @@ namespace matrix
 
 		// *
 
-		template<bool otherCallDestructor>
-		inline vector<int> operator*(vector<int, otherCallDestructor>& other)
+		inline vector<int> operator*(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7252,8 +7447,7 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline void operator*=(vector<int, otherCallDestructor>& other)
+		inline void operator*=(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7303,8 +7497,7 @@ namespace matrix
 
 		// /
 
-		template<bool otherCallDestructor>
-		inline vector<int> operator/(vector<int, otherCallDestructor>& other)
+		inline vector<int> operator/(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7362,8 +7555,7 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline void operator/=(vector<int, otherCallDestructor>& other)
+		inline void operator/=(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7413,8 +7605,7 @@ namespace matrix
 
 		// ==
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator==(vector<int, otherCallDestructor>& other)
+		inline vector<uint8_t> operator==(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7492,8 +7683,7 @@ namespace matrix
 
 		// !=
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator!=(vector<int, otherCallDestructor>& other)
+		inline vector<uint8_t> operator!=(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7574,8 +7764,7 @@ namespace matrix
 
 		// >
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator>(vector<int, otherCallDestructor>& other)
+		inline vector<uint8_t> operator>(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7651,8 +7840,7 @@ namespace matrix
 
 		// < 
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator<(vector<int, otherCallDestructor>& other)
+		inline vector<uint8_t> operator<(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7739,8 +7927,7 @@ namespace matrix
 
 		// >=
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator>=(vector<int, otherCallDestructor>& other)
+		inline vector<uint8_t> operator>=(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7822,8 +8009,7 @@ namespace matrix
 
 		// <=
 
-		template<bool otherCallDestructor>
-		inline vector<uint8_t> operator<=(vector<int, otherCallDestructor>& other)
+		inline vector<uint8_t> operator<=(vector<int>& other)
 		{
 #ifdef _DEBUG
 			if (this->_size != other._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -7952,8 +8138,7 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherCallDestructor>
-		inline vector<int> pow(vector<int, otherCallDestructor>& other)
+		inline vector<int> pow(vector<int>& other)
 		{
 			size_t size = this->_size;
 
@@ -8047,8 +8232,7 @@ namespace matrix
 			}
 		}
 
-		template<bool otherCallDestructor>
-		inline void self_pow(vector<int, otherCallDestructor>& other)
+		inline void self_pow(vector<int>& other)
 		{
 			size_t size = this->_size;
 
@@ -8093,6 +8277,11 @@ namespace matrix
 				}
 				data1[i] = result_pow;
 			}
+		}
+
+		inline void sort()
+		{
+			std::sort(this->_data, this->_data + this->_size);
 		}
 
 		// Cast
@@ -8177,17 +8366,19 @@ namespace matrix
 
 	private:
 		int* _data;
+		int* dataToDelete;
 		size_t _size;
 		size_t finalPos;
 	};
 
-	template <bool thisTransposed, bool thisContiguous, bool thisCallDestructor>
-	class matrix<double, thisTransposed, thisContiguous, thisCallDestructor>
+	template <bool thisTransposed, bool thisContiguous>
+	class matrix<double, thisTransposed, thisContiguous>
 	{
 	public:
 
 		inline matrix(size_t rows, size_t cols) :
 			_data(new double[rows * cols]),
+			dataToDelete(_data),
 			_rows(rows),
 			_cols(cols),
 			_size(rows * cols),
@@ -8199,6 +8390,7 @@ namespace matrix
 
 		inline matrix(double* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols) :
 			_data(data),
+			dataToDelete(nullptr),
 			_rows(rows),
 			_cols(cols),
 			_size(rows* cols),
@@ -8208,24 +8400,24 @@ namespace matrix
 			finalPosCols((_cols / 4) * 4),
 			finalPosSize((_size / 4) * 4) {}
 
-		inline ~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~matrix() { delete[] this->dataToDelete; }
 
 		// Friend classes
 
-		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		template <typename T, bool tranposed, bool contiguous>
 		friend class matrix;
 
-		template <typename T, bool otherCallDestructor>
+		template <typename T>
 		friend class vector;
 
 		// Friend functions
 
-		template<bool returnTransposed, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
-			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-		friend inline matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
+		template<bool returnTransposed, bool matrix1Transposed, bool matrix1Contiguous,
+			bool matrix2Transposed, bool matrix2Contiguous>
+		friend inline matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous>&, matrix<double, matrix2Transposed, matrix2Contiguous>&);
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& matrix);
+		template<bool otherTransposed, bool otherContiguous>
+		friend std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous>& matrix);
 
 		//----------------
 
@@ -8235,11 +8427,11 @@ namespace matrix
 
 		inline double* data() { return this->_data; }
 
-		inline matrix<double, thisTransposed, thisContiguous, false> row(size_t row)
+		inline matrix<double, thisTransposed, thisContiguous> row(size_t row)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<double, true, thisContiguous, false>(
+				return matrix<double, true, thisContiguous>(
 					&this->_data[row],
 					1,
 					this->_cols,
@@ -8248,7 +8440,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<double, false, thisContiguous, false>(
+				return matrix<double, false, thisContiguous>(
 					&this->_data[row * this->actualCols],
 					1,
 					this->_cols,
@@ -8257,11 +8449,11 @@ namespace matrix
 			}
 		}
 
-		inline matrix<double, thisTransposed, thisContiguous, false> col(size_t col)
+		inline matrix<double, thisTransposed, thisContiguous> col(size_t col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<double, true, thisContiguous, false>(
+				return matrix<double, true, thisContiguous>(
 					&this->_data[col * this->actualRows],
 					this->_rows,
 					1,
@@ -8270,7 +8462,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<double, false, thisContiguous, false>(
+				return matrix<double, false, thisContiguous>(
 					&this->_data[col],
 					this->_rows,
 					1,
@@ -8279,9 +8471,9 @@ namespace matrix
 			}
 		}
 
-		inline matrix<double, !thisTransposed, thisContiguous, false> tranpose()
+		inline matrix<double, !thisTransposed, thisContiguous> tranpose()
 		{
-			return matrix<double, !thisTransposed, thisContiguous, false>(
+			return matrix<double, !thisTransposed, thisContiguous>(
 				this->_data,
 				this->_cols,
 				this->_rows,
@@ -8291,11 +8483,11 @@ namespace matrix
 		}
 
 		template<bool blockContiguous = false>
-		inline matrix<double, thisTransposed, thisContiguous && blockContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
+		inline matrix<double, thisTransposed, thisContiguous && blockContiguous> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<double, true, thisContiguous && blockContiguous, false>(
+				return matrix<double, true, thisContiguous && blockContiguous>(
 					&this->_data[initial_col * this->actualRows + initial_row],
 					final_row - initial_row,
 					final_col - initial_col,
@@ -8305,7 +8497,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<double, false, thisContiguous && blockContiguous, false>(
+				return matrix<double, false, thisContiguous && blockContiguous>(
 					&this->_data[initial_row * this->actualCols + initial_col],
 					final_row - initial_row,
 					final_col - initial_col,
@@ -8635,8 +8827,8 @@ namespace matrix
 
 		// +
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<double> operator+(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<double> operator+(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -9109,8 +9301,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void operator+=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void operator+=(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -9749,8 +9941,8 @@ namespace matrix
 
 		// -
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<double> operator-(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<double> operator-(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -10223,8 +10415,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void operator-=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void operator-=(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -10863,8 +11055,8 @@ namespace matrix
 
 		// *
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<double> operator*(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<double> operator*(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -11337,8 +11529,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void operator*=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void operator*=(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -11977,8 +12169,8 @@ namespace matrix
 
 		// /
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<double> operator/(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<double> operator/(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -12451,8 +12643,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void operator/=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void operator/=(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -13091,8 +13283,8 @@ namespace matrix
 
 		// ==
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator==(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator==(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -13611,8 +13803,8 @@ namespace matrix
 
 		// !=
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator!=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator!=(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -14131,8 +14323,8 @@ namespace matrix
 
 		// >
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator>(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator>(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -14651,8 +14843,8 @@ namespace matrix
 
 		// <
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator<(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator<(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -15171,8 +15363,8 @@ namespace matrix
 
 		// >=
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator>=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator>=(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -15691,8 +15883,8 @@ namespace matrix
 
 		// <=
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator<=(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator<=(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -20494,8 +20686,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<double> pow(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<double> pow(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -21106,8 +21298,8 @@ namespace matrix
 			}
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void self_pow(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void self_pow(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -21610,8 +21802,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<double> root(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<double> root(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -22226,8 +22418,8 @@ namespace matrix
 			}
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void self_root(const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void self_root(const matrix<double, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -26574,17 +26766,19 @@ namespace matrix
 
 	private:
 		double* _data;
+		double* dataToDelete;
 		size_t _rows, _cols, _size;
 		size_t actualRows, actualCols;
 		size_t finalPosRows, finalPosCols, finalPosSize;
 	};
 
-	template <bool thisTransposed, bool thisContiguous, bool thisCallDestructor>
-	class matrix<uint8_t, thisTransposed, thisContiguous, thisCallDestructor>
+	template <bool thisTransposed, bool thisContiguous>
+	class matrix<uint8_t, thisTransposed, thisContiguous>
 	{
 	public:
 		inline matrix(size_t rows, size_t cols) : 
 			_data(new uint8_t[rows * cols]), 
+			dataToDelete(_data),
 			_rows(rows), 
 			_cols(cols), 
 			_size(rows* cols),
@@ -26598,7 +26792,8 @@ namespace matrix
 			finalPosActualCols256((cols / 256) * 256) {}
 
 		inline matrix(uint8_t* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols) :
-			_data(data),
+			_data(data), 
+			dataToDelete(nullptr),
 			_rows(rows),
 			_cols(cols),
 			_size(rows* cols),
@@ -26611,20 +26806,20 @@ namespace matrix
 			finalPosActualRows256((rows / 256) * 256),
 			finalPosActualCols256((cols / 256) * 256) {}
 
-		inline ~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~matrix() { delete[] this->dataToDelete; }
 
 		// Friend classes
 
-		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		template <typename T, bool tranposed, bool contiguous>
 		friend class matrix;
 
-		template <typename T, bool otherCallDestructor>
+		template <typename T>
 		friend class vector;
 
 		// Friend functions
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& matrix);
+		template<bool otherTransposed, bool otherContiguous>
+		friend std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous>& matrix);
 
 		inline size_t rows() { return this->_rows; };
 
@@ -26632,11 +26827,11 @@ namespace matrix
 
 		inline uint8_t* data() { return this->_data; };
 
-		inline matrix<uint8_t, thisTransposed, thisContiguous, false> row(size_t row)
+		inline matrix<uint8_t, thisTransposed, thisContiguous> row(size_t row)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<uint8_t, true, thisContiguous, false>(
+				return matrix<uint8_t, true, thisContiguous>(
 					&this->_data[row],
 					1,
 					this->_cols,
@@ -26645,7 +26840,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<uint8_t, false, thisContiguous, false>(
+				return matrix<uint8_t, false, thisContiguous>(
 					&this->_data[row * this->actualCols],
 					1,
 					this->_cols,
@@ -26654,11 +26849,11 @@ namespace matrix
 			}
 		}
 
-		inline matrix<uint8_t, thisTransposed, thisContiguous, false> col(size_t col)
+		inline matrix<uint8_t, thisTransposed, thisContiguous> col(size_t col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<uint8_t, true, thisContiguous, false>(
+				return matrix<uint8_t, true, thisContiguous>(
 					&this->_data[col * this->actualRows],
 					this->_rows,
 					1,
@@ -26667,7 +26862,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<uint8_t, false, thisContiguous, false>(
+				return matrix<uint8_t, false, thisContiguous>(
 					&this->_data[col],
 					this->_rows,
 					1,
@@ -26676,9 +26871,9 @@ namespace matrix
 			}
 		}
 
-		inline matrix<uint8_t, !thisTransposed, thisContiguous, false> tranpose()
+		inline matrix<uint8_t, !thisTransposed, thisContiguous> tranpose()
 		{
-			return matrix<uint8_t, !thisTransposed, thisContiguous, false>(
+			return matrix<uint8_t, !thisTransposed, thisContiguous>(
 				this->_data,
 				this->_cols,
 				this->_rows,
@@ -26688,11 +26883,11 @@ namespace matrix
 		}
 
 		template<bool blockContiguous = false>
-		inline matrix<uint8_t, thisTransposed, thisContiguous && blockContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
+		inline matrix<uint8_t, thisTransposed, thisContiguous && blockContiguous> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<uint8_t, true, thisContiguous && blockContiguous, false>(
+				return matrix<uint8_t, true, thisContiguous && blockContiguous>(
 					&this->_data[initial_col * this->actualRows + initial_row],
 					final_row - initial_row,
 					final_col - initial_col,
@@ -26736,8 +26931,8 @@ namespace matrix
 			}
 		}
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator&&(matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator&&(matrix<uint8_t, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -26946,8 +27141,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator||(matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator||(matrix<uint8_t, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -27652,19 +27847,21 @@ namespace matrix
 	private:
 
 		uint8_t* _data;
+		uint8_t* dataToDelete;
 		size_t _rows, _cols, _size;
 		size_t actualRows, actualCols;
 		size_t finalPosSize, finalPosRows, finalPosCols;
 		size_t finalPosSize256, finalPosActualRows256, finalPosActualCols256;
 	};
 
-	template <bool thisTransposed, bool thisContiguous, bool thisCallDestructor>
-	class matrix<float, thisTransposed, thisContiguous, thisCallDestructor>
+	template <bool thisTransposed, bool thisContiguous>
+	class matrix<float, thisTransposed, thisContiguous>
 	{
 	public:
 
 		inline matrix(size_t rows, size_t cols) :
-			_data(new float[rows * cols]),
+			_data(new float[rows * cols]), 
+			dataToDelete(_data),
 			_rows(rows),
 			_cols(cols),
 			_size(rows* cols),
@@ -27675,7 +27872,8 @@ namespace matrix
 			finalPosSize((_size / 8) * 8) {}
 
 		inline matrix(float* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols) :
-			_data(data),
+			_data(data), 
+			dataToDelete(nullptr),
 			_rows(rows),
 			_cols(cols),
 			_size(rows* cols),
@@ -27685,24 +27883,24 @@ namespace matrix
 			finalPosCols((_cols / 8) * 8),
 			finalPosSize((_size / 8) * 8) {}
 
-		inline ~matrix() { if constexpr (thisCallDestructor) delete[] this->_data; }
+		inline ~matrix() { delete[] this->dataToDelete; }
 
 		// Friend classes
 
-		template <typename T, bool tranposed, bool contiguous, bool otherCallDestructor>
+		template <typename T, bool tranposed, bool contiguous>
 		friend class matrix;
 
-		template <typename T, bool otherCallDestructor>
+		template <typename T>
 		friend class vector;
 
 		// Friend functions
 
-		template<bool returnTransposed, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
-			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-		friend inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>&, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>&);
+		template<bool returnTransposed, bool matrix1Transposed, bool matrix1Contiguous,
+			bool matrix2Transposed, bool matrix2Contiguous>
+		friend inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous>&, matrix<float, matrix2Transposed, matrix2Contiguous>&);
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		friend std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& matrix);
+		template<bool otherTransposed, bool otherContiguous>
+		friend std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous>& matrix);
 		
 		//----------------
 
@@ -27712,11 +27910,11 @@ namespace matrix
 
 		inline float* data() { return this->_data; }
 
-		inline matrix<float, thisTransposed, thisContiguous, false> row(size_t row)
+		inline matrix<float, thisTransposed, thisContiguous> row(size_t row)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<float, true, thisContiguous, false>(
+				return matrix<float, true, thisContiguous>(
 					&this->_data[row],
 					1,
 					this->_cols,
@@ -27725,7 +27923,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<float, false, thisContiguous, false>(
+				return matrix<float, false, thisContiguous>(
 					&this->_data[row * this->actualCols],
 					1,
 					this->_cols,
@@ -27734,11 +27932,11 @@ namespace matrix
 			}
 		}
 
-		inline matrix<float, thisTransposed, thisContiguous, false> col(size_t col)
+		inline matrix<float, thisTransposed, thisContiguous> col(size_t col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<float, true, thisContiguous, false>(
+				return matrix<float, true, thisContiguous>(
 					&this->_data[col * this->actualRows],
 					this->_rows,
 					1,
@@ -27747,7 +27945,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<float, false, thisContiguous, false>(
+				return matrix<float, false, thisContiguous>(
 					&this->_data[col],
 					this->_rows,
 					1,
@@ -27756,9 +27954,9 @@ namespace matrix
 			}
 		}
 
-		inline matrix<float, !thisTransposed, thisContiguous, false> tranpose()
+		inline matrix<float, !thisTransposed, thisContiguous> tranpose()
 		{
-			return matrix<float, !thisTransposed, thisContiguous, false>(
+			return matrix<float, !thisTransposed, thisContiguous>(
 				this->_data,
 				this->_cols,
 				this->_rows,
@@ -27768,11 +27966,11 @@ namespace matrix
 		}
 
 		template<bool blockContiguous = false>
-		inline matrix<float, thisTransposed, thisContiguous && blockContiguous, false> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
+		inline matrix<float, thisTransposed, thisContiguous && blockContiguous> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col)
 		{
 			if constexpr (thisTransposed)
 			{
-				return matrix<float, true, thisContiguous&& blockContiguous, false>(
+				return matrix<float, true, thisContiguous && blockContiguous>(
 					&this->_data[initial_col * this->actualRows + initial_row],
 					final_row - initial_row,
 					final_col - initial_col,
@@ -27782,7 +27980,7 @@ namespace matrix
 			}
 			else
 			{
-				return matrix<float, false, thisContiguous&& blockContiguous, false>(
+				return matrix<float, false, thisContiguous && blockContiguous>(
 					&this->_data[initial_row * this->actualCols + initial_col],
 					final_row - initial_row,
 					final_col - initial_col,
@@ -28048,8 +28246,8 @@ namespace matrix
 
 		// +
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float> operator+(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<float> operator+(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -28340,8 +28538,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void operator+=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void operator+=(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -28792,8 +28990,8 @@ namespace matrix
 
 		// -
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float> operator-(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<float> operator-(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -29084,8 +29282,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void operator-=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void operator-=(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -29536,8 +29734,8 @@ namespace matrix
 
 		// *
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float> operator*(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<float> operator*(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -29828,8 +30026,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void operator*=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void operator*=(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -30280,8 +30478,8 @@ namespace matrix
 
 		// /
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float> operator/(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<float> operator/(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -30572,8 +30770,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void operator/=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void operator/=(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -31024,8 +31222,8 @@ namespace matrix
 
 		// ==
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator==(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator==(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -31425,8 +31623,8 @@ namespace matrix
 
 		// !=
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator!=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator!=(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -31826,8 +32024,8 @@ namespace matrix
 
 		// >
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator>(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator>(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -32227,8 +32425,8 @@ namespace matrix
 
 		// <
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator<(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator<(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -32628,8 +32826,8 @@ namespace matrix
 
 		// >=
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator>=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator>=(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -33029,8 +33227,8 @@ namespace matrix
 
 		// <=
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<uint8_t> operator<=(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t> operator<=(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -36478,8 +36676,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float> pow(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<float> pow(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -36866,8 +37064,8 @@ namespace matrix
 			}
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void self_pow(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void self_pow(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -37219,8 +37417,8 @@ namespace matrix
 			return result;
 		}
 
-		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline matrix<float> root(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
+		inline matrix<float> root(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -37611,8 +37809,8 @@ namespace matrix
 			}
 		}
 
-		template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-		inline void self_root(const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& other)
+		template<bool otherTransposed, bool otherContiguous>
+		inline void self_root(const matrix<float, otherTransposed, otherContiguous>& other)
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
@@ -41569,6 +41767,7 @@ namespace matrix
 
 	private:
 		float* _data;
+		float* dataToDelete;
 		size_t _rows, _cols, _size;
 		size_t actualRows, actualCols;
 		size_t finalPosRows, finalPosCols, finalPosSize;
@@ -41576,8 +41775,7 @@ namespace matrix
 
 	// Where
 
-	template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
-	inline vector<double> where(vector<uint8_t, callDestructor1>& vector1, vector<double, callDestructor2>& vector2, vector<double, callDestructor3>& vector3)
+	inline vector<double> where(vector<uint8_t>& vector1, vector<double>& vector2, vector<double>& vector3)
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size || vector2._size != vector3._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -41608,8 +41806,7 @@ namespace matrix
 		return result;
 	}
 	
-	template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
-	inline vector<float> where(vector<uint8_t, callDestructor1>& vector1, vector<float, callDestructor2>& vector2, vector<float, callDestructor3>& vector3)
+	inline vector<float> where(vector<uint8_t>& vector1, vector<float>& vector2, vector<float>& vector3)
 
 	{
 #ifdef _DEBUG
@@ -41641,8 +41838,7 @@ namespace matrix
 		return result;
 	}
 
-	template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
-	inline vector<uint64_t> where(vector<uint8_t, callDestructor1>& vector1, vector<uint64_t, callDestructor2>& vector2, vector<uint64_t, callDestructor3>& vector3)
+	inline vector<uint64_t> where(vector<uint8_t>& vector1, vector<uint64_t>& vector2, vector<uint64_t>& vector3)
 
 	{
 #ifdef _DEBUG
@@ -41674,8 +41870,7 @@ namespace matrix
 		return result;
 	}
 
-	template <bool callDestructor1, bool callDestructor2, bool callDestructor3>
-	inline vector<int> where(vector<uint8_t, callDestructor1>& vector1, vector<int, callDestructor2>& vector2, vector<int, callDestructor3>& vector3)
+	inline vector<int> where(vector<uint8_t>& vector1, vector<int>& vector2, vector<int>& vector3)
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size || vector2._size != vector3._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -41708,8 +41903,7 @@ namespace matrix
 
 	// Dot
 
-	template <bool callDestructor1, bool callDestructor2>
-	inline double dot(vector<double, callDestructor1>& vector1, vector<double, callDestructor2>& vector2)
+	inline double dot(vector<double>& vector1, vector<double>& vector2)
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -41752,9 +41946,9 @@ namespace matrix
 		return dotProduct;
 	}
 
-	template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
-			bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-	inline matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous, matrix1Destructor>& matrix1, matrix<double, matrix2Transposed, matrix2Contiguous, matrix2Destructor>& matrix2)
+	template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous,
+			bool matrix2Transposed, bool matrix2Contiguous>
+	inline matrix<double> dot(matrix<double, matrix1Transposed, matrix1Contiguous>& matrix1, matrix<double, matrix2Transposed, matrix2Contiguous>& matrix2)
 	{
 #ifdef _DEBUG
 		if (matrix1._cols != matrix2._rows) throw std::invalid_argument("Wrong dimensions");
@@ -42217,8 +42411,7 @@ namespace matrix
 		return result;
 	}
 
-	template <bool callDestructor1, bool callDestructor2>
-	inline float dot(vector<float, callDestructor1>& vector1, vector<float, callDestructor2>& vector2)
+	inline float dot(vector<float>& vector1, vector<float>& vector2)
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -42261,9 +42454,9 @@ namespace matrix
 		return dotProduct;
 	}
 	
-	template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous, bool matrix1Destructor,
-		bool matrix2Transposed, bool matrix2Contiguous, bool matrix2Destructor>
-	inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous, matrix1Destructor>& matrix1, matrix<float, matrix2Transposed, matrix2Contiguous, matrix2Destructor>& matrix2)
+	template<bool returnTransposed = false, bool matrix1Transposed, bool matrix1Contiguous,
+		bool matrix2Transposed, bool matrix2Contiguous>
+	inline matrix<float> dot(matrix<float, matrix1Transposed, matrix1Contiguous>& matrix1, matrix<float, matrix2Transposed, matrix2Contiguous>& matrix2)
 	{
 #ifdef _DEBUG
 		if (matrix1._cols != matrix2._rows) throw std::invalid_argument("Wrong dimensions");
@@ -42726,8 +42919,7 @@ namespace matrix
 
 	// Cout
 
-	template<bool otherCallDestructor>
-	std::ostream& operator<<(std::ostream& os, const vector<double, otherCallDestructor>& vector)
+	std::ostream& operator<<(std::ostream& os, const vector<double>& vector)
 	{
 		for (size_t i = 0; i < vector._size; i++)
 		{
@@ -42736,8 +42928,7 @@ namespace matrix
 		return os;
 	}
 
-	template<bool otherCallDestructor>
-	std::ostream& operator<<(std::ostream& os, const vector<uint64_t, otherCallDestructor>& vector)
+	std::ostream& operator<<(std::ostream& os, const vector<uint64_t>& vector)
 	{
 		for (size_t i = 0; i < vector._size; i++)
 		{
@@ -42746,8 +42937,7 @@ namespace matrix
 		return os;
 	}
 
-	template<bool otherCallDestructor>
-	std::ostream& operator<<(std::ostream& os, const vector<uint8_t, otherCallDestructor>& vector)
+	std::ostream& operator<<(std::ostream& os, const vector<uint8_t>& vector)
 	{
 		for (size_t i = 0; i < vector._size; i++)
 		{
@@ -42756,8 +42946,7 @@ namespace matrix
 		return os;
 	}
 
-	template<bool otherCallDestructor>
-	std::ostream& operator<<(std::ostream& os, const vector<float, otherCallDestructor>& vector)
+	std::ostream& operator<<(std::ostream& os, const vector<float>& vector)
 	{
 		for (size_t i = 0; i < vector._size; i++)
 		{
@@ -42766,8 +42955,7 @@ namespace matrix
 		return os;
 	}
 
-	template<bool otherCallDestructor>
-	std::ostream& operator<<(std::ostream& os, const vector<int, otherCallDestructor>& vector)
+	std::ostream& operator<<(std::ostream& os, const vector<int>& vector)
 	{
 		for (size_t i = 0; i < vector._size; i++)
 		{
@@ -42776,8 +42964,8 @@ namespace matrix
 		return os;
 	}
 
-	template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-	std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+	template<bool otherTransposed, bool otherContiguous>
+	std::ostream& operator<<(std::ostream& os, const matrix<double, otherTransposed, otherContiguous>& matrix)
 	{
 		size_t rows = matrix._rows;
 		size_t cols = matrix._cols;
@@ -42813,8 +43001,8 @@ namespace matrix
 		return os;
 	}
 
-	template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-	std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+	template<bool otherTransposed, bool otherContiguous>
+	std::ostream& operator<<(std::ostream& os, const matrix<float, otherTransposed, otherContiguous>& matrix)
 	{
 		size_t rows = matrix._rows;
 		size_t cols = matrix._cols;
@@ -42850,8 +43038,8 @@ namespace matrix
 		return os;
 	}
 
-	template<bool otherTransposed, bool otherContiguous, bool otherCallDestructor>
-	std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous, otherCallDestructor>& matrix)
+	template<bool otherTransposed, bool otherContiguous>
+	std::ostream& operator<<(std::ostream& os, const matrix<uint8_t, otherTransposed, otherContiguous>& matrix)
 	{
 		size_t rows = matrix._rows;
 		size_t cols = matrix._cols;
