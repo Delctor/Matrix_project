@@ -470,7 +470,7 @@ namespace matrix
 
 				for (size_t i = 0; i < finalPos; i += 8)
 				{
-					_mm256_storeu_epi32(&dataResult[i], _mm256_blendv_ps(_mm256_castsi256_ps(zero), _mm256_castsi256_ps(one), _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i])))));
+					_mm256_storeu_epi32(&dataResult[i], _mm256_castps_si256(_mm256_blendv_ps(_mm256_castsi256_ps(zero), _mm256_castsi256_ps(one), _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i]))))));
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
@@ -7076,7 +7076,7 @@ namespace matrix
 					dataResult[i] = static_cast<T>(data1[i]);
 				}
 			}
-			return dataResult;
+			return result;
 		}
 
 	private:
@@ -8368,10 +8368,10 @@ namespace matrix
 					dataResult[i] = static_cast<double>(data1[i]);
 				}
 			}
-			else if constexpr (std::is_same<T, uint8_t>)
+			else if constexpr (std::is_same<T, uint8_t>::value)
 			{
 				size_t finalPos = this->finalPos;
-				__m256i zero = _mm256_setzero_si256();
+				__m256 zero = _mm256_setzero_ps();
 				__m256i indices = _mm256_setr_epi32(0, 7, 2, 3, 4, 5, 6, 1);
 				for (size_t i = 0; i < finalPos; i += 8)
 				{
@@ -26666,7 +26666,7 @@ namespace matrix
 
 			double* data1 = this->_data;
 
-			T* dataResult = matrix._data;
+			T* dataResult = result._data;
 
 			size_t actualCols = this->actualCols;
 			size_t actualRows = this->actualRows;
@@ -26963,6 +26963,39 @@ namespace matrix
 			else
 			{
 				return this->_data[row * this->actualCols + col];
+			}
+		}
+
+		// Set constant
+
+		inline void set_const(uint8_t num)
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			uint8_t* data1 = this->_data;
+
+			if constexpr (thisTransposed)
+			{
+				size_t matrix1ActualRows = this->actualRows;
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < cols; j++)
+					{
+						data1[j * matrix1ActualRows + i] = num;
+					}
+				}
+			}
+			else
+			{
+				size_t matrix1ActualCols = this->actualCols;
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < cols; j++)
+					{
+						data1[i * matrix1ActualCols + j] = num;
+					}
+				}
 			}
 		}
 
@@ -41725,7 +41758,7 @@ namespace matrix
 					}
 				}
 			}
-			else if constexpr (std::is_same<T, uint8_t>)
+			else if constexpr (std::is_same<T, uint8_t>::value)
 			{
 				if constexpr (thisTransposed)
 				{
