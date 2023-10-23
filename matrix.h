@@ -65,12 +65,9 @@ namespace matrix
 	{
 		static_assert(std::is_same<T, double>::value ||
 			std::is_same<T, float>::value ||
-			std::is_same<T, int>::value ||
-			std::is_same<T, uint64_t>::value ||
-			std::is_same<T, int64_t>::value ||
 			std::is_same<T, uint8_t>::value
 			,
-			"The data type only can be double or float");
+			"The data type only can be double, float or uint8_t");
 	};
 
 	//-----------------------------------
@@ -1867,6 +1864,8 @@ namespace matrix
 				data1[i] >>= data2[i];
 			}
 		}
+
+		// Sort
 
 		inline void sort()
 		{
@@ -4433,10 +4432,14 @@ namespace matrix
 			return exp / exp.sum();
 		}
 
+		// Sort
+
 		inline void sort() 
 		{
 			std::sort(this->_data, this->_data + this->_size);
 		}
+
+		// Cast
 
 		template <typename T>
 		inline vector<T> cast()
@@ -6975,10 +6978,14 @@ namespace matrix
 			return exp / exp.sum();
 		}
 
+		// Sort
+
 		inline void sort()
 		{
 			std::sort(this->_data, this->_data + this->_size);
 		}
+
+		// Cast
 
 		template <typename T>
 		inline vector<T> cast()
@@ -8278,6 +8285,8 @@ namespace matrix
 				data1[i] = result_pow;
 			}
 		}
+
+		// Sort
 
 		inline void sort()
 		{
