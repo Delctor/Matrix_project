@@ -57,7 +57,7 @@ namespace matrix
 			std::is_same<T, int64_t>::value ||
 			std::is_same<T, uint8_t>::value
 			,
-			"The data type only can be double, float, int, uint64_t or int64_t or uint8_t");
+			"The data type can only be double, float, int, uint64_t or int64_t or uint8_t");
 	};
 	
 	template <typename T, bool tranposed = false, bool contiguous = true>
@@ -67,7 +67,7 @@ namespace matrix
 			std::is_same<T, float>::value ||
 			std::is_same<T, uint8_t>::value
 			,
-			"The data type only can be double, float or uint8_t");
+			"The data type can only be double, float or uint8_t");
 	};
 
 	//-----------------------------------
