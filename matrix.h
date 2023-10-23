@@ -440,7 +440,7 @@ namespace matrix
 
 				for (size_t i = 0; i < finalPos; i += 8)
 				{
-					_mm256_store_ps(&dataResult[i], _mm256_blendv_ps(zero, one, _mm256_castsi256_pd(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i])))));
+					_mm256_store_ps(&dataResult[i], _mm256_blendv_ps(zero, one, _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i])))));
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
