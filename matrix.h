@@ -90,6 +90,8 @@ namespace matrix
 	class vector<uint8_t>
 	{
 	public:
+		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
+
 		inline vector(size_t size) : _data(new uint8_t[size]), dataToDelete(_data), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
 
 		inline vector(uint8_t* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
@@ -496,6 +498,8 @@ namespace matrix
 	class vector<uint64_t>
 	{
 	public:
+		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
+
 		inline vector(size_t size) : _data(new uint64_t[size]), dataToDelete(_data), _size(size), finalPos((size / 4) * 4) {}
 
 		inline vector(uint64_t* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 4) * 4) {}
@@ -4559,6 +4563,7 @@ namespace matrix
 	class vector<float>
 	{
 	public:
+		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
 		inline vector(size_t size) : _data(new float[size]), dataToDelete(_data), _size(size), finalPos((size / 8) * 8) {}
 
 		inline vector(float* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 8) * 8) {}
@@ -7104,6 +7109,7 @@ namespace matrix
 	class vector<int>
 	{
 	public:
+		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
 
 		inline vector(size_t size) : _data(new int[size]), dataToDelete(_data), _size(size), finalPos((size / 8) * 8) {}
 
