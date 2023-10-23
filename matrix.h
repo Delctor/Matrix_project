@@ -157,6 +157,22 @@ namespace matrix
 			return result;
 		}
 
+		// Set Constant
+
+		inline void set_const(uint8_t num)
+		{
+			size_t size = this->_size;
+
+			size_t finalPos = this->finalPos;
+
+			uint8_t* data1 = this->_data;
+
+			for (size_t i = 0; i < size; i++)
+			{
+				data1[i] = num;
+			}
+		}
+
 		// =
 
 		inline vector<uint8_t>& operator=(vector<uint8_t>& other)
@@ -385,6 +401,7 @@ namespace matrix
 			{
 				if (data1[i]) sum++;
 			}
+			return sum;
 		}
 
 		// Cast
@@ -408,7 +425,7 @@ namespace matrix
 
 				for (size_t i = 0; i < finalPos; i += 4)
 				{
-					_mm256_store_pd(&dataResult[i], _mm256_blend_pd(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
+					_mm256_store_pd(&dataResult[i], _mm256_blendv_pd(zero, one, _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_loadu_epi8(&data1[i])))));
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
@@ -423,7 +440,7 @@ namespace matrix
 
 				for (size_t i = 0; i < finalPos; i += 8)
 				{
-					_mm256_store_ps(&dataResult[i], _mm256_blend_ps(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
+					_mm256_store_ps(&dataResult[i], _mm256_blendv_ps(zero, one, _mm256_castsi256_pd(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i])))));
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
@@ -438,7 +455,7 @@ namespace matrix
 
 				for (size_t i = 0; i < finalPos; i += 4)
 				{
-					_mm256_storeu_epi64(&dataResult[i], _mm256_castpd_si256(_mm256_blend_pd(_mm256_castsi256_pd(one), _mm256_castsi256_pd(zero), _mm_movemask_epi8(_mm_loadu_epi8(&data1[i])))));
+					_mm256_storeu_epi64(&dataResult[i], _mm256_castpd_si256(_mm256_blendv_pd(_mm256_castsi256_pd(zero), _mm256_castsi256_pd(one), _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_loadu_epi8(&data1[i]))))));
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
@@ -453,13 +470,14 @@ namespace matrix
 
 				for (size_t i = 0; i < finalPos; i += 8)
 				{
-					_mm256_storeu_epi32(&dataResult[i], _mm256_blend_epi32(one, zero, _mm_movemask_epi8(_mm_loadu_epi8(&data1[i]))));
+					_mm256_storeu_epi32(&dataResult[i], _mm256_blendv_ps(_mm256_castsi256_ps(zero), _mm256_castsi256_ps(one), _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_loadu_epi8(&data1[i])))));
 				}
 				for (size_t i = finalPos; i < size; i++)
 				{
 					dataResult[i] = data1[i] ? 1 : 0;
 				}
 			}
+			return result;
 		}
 
 	private:
