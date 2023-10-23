@@ -84,6 +84,8 @@ namespace matrix
 		__seeds__ = _mm256_loadu_epi64(seeds);
 	}
 
+	// Vector
+
 	template <>
 	class vector<uint8_t>
 	{
@@ -8406,10 +8408,24 @@ namespace matrix
 		size_t finalPos;
 	};
 
+	// Matrix
+
 	template <bool thisTransposed, bool thisContiguous>
 	class matrix<double, thisTransposed, thisContiguous>
 	{
 	public:
+
+		inline matrix() : 
+			_data(nullptr), 
+			dataToDelete(nullptr), 
+			_rows(0), 
+			_cols(0),
+			_size(0),
+			actualRows(0),
+			actualCols(0),
+			finalPosRows(0),
+			finalPosCols(0),
+			finalPosSize(0) {}
 
 		inline matrix(size_t rows, size_t cols) :
 			_data(new double[rows * cols]),
@@ -8421,14 +8437,14 @@ namespace matrix
 			actualCols(cols),
 			finalPosRows((_rows / 4) * 4), 
 			finalPosCols((_cols / 4) * 4),
-			finalPosSize(((rows* cols) / 4) * 4) {}
+			finalPosSize(((rows * cols) / 4) * 4) {}
 
 		inline matrix(double* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols) :
 			_data(data),
 			dataToDelete(nullptr),
 			_rows(rows),
 			_cols(cols),
-			_size(rows* cols),
+			_size(rows * cols),
 			actualRows(actualRows),
 			actualCols(actualCols),
 			finalPosRows((_rows / 4) * 4),
@@ -8564,6 +8580,164 @@ namespace matrix
 			{
 				return this->_data[row * this->actualCols + col];
 			}
+		}
+
+		// Copy
+
+		template<bool returnTransposed = false>
+		inline matrix<double> copy()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			double* data1 = this->_data;
+
+			matrix<double> result(rows, cols);
+
+			double* dataResult = result._data;
+
+			if constexpr (thisTransposed)
+			{
+				size_t actualRows = this->actualRows;
+				if constexpr (returnTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[j * rows + i] = data1[j * actualRows + i];
+						}
+					}
+				}
+				else
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[j * actualRows + i];
+						}
+					}
+				}
+			}
+			else
+			{
+				size_t actualCols = this->actualCols;
+				if constexpr (returnTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[j * rows + i] = data1[i * actualCols + j];
+						}
+					}
+				}
+				else
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j];
+						}
+					}
+				}
+			}
+			return result;
+		}
+
+		// =
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline matrix<double, thisTransposed, thisContiguous>& operator=(matrix<double, otherTransposed, otherContiguous>& other)
+		{
+			if (this->_data == nullptr)
+			{
+#ifdef _DEBUG
+				if (other.dataToDelete == nullptr) throw std::invalid_argument("Error");
+#else
+#endif
+				this->_data = other._data;
+				this->dataToDelete = this->_data;
+				other.dataToDelete = nullptr;
+				this->_size = other._size;
+				this->_rows = other._rows;
+				this->_cols = other._cols;
+				this->finalPosCols = other.finalPosCols;
+				this->finalPosRows = other.finalPosRows;
+				this->finalPosSize = other.finalPosSize;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
+#else
+#endif
+				size_t rows = this->_rows;
+				size_t cols = this->_cols;
+
+				double* data1 = this->_data;
+				double* data2 = other._data;
+
+				if constexpr (thisTransposed)
+				{
+					size_t matrix1ActualRows = this->actualRows;
+					if constexpr (otherTransposed)
+					{
+						size_t matrix2ActualRows = other.actualRows;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[j * matrix1ActualRows + i] = data2[j * matrix2ActualRows + i];
+							}
+						}
+					}
+					else
+					{
+						size_t matrix2ActualCols = other.actualCols;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[j * matrix1ActualRows + i] = data2[i * matrix2ActualCols + j];
+							}
+						}
+					}
+				}
+				else
+				{
+					size_t matrix1ActualCols = this->actualCols;
+					if constexpr (otherTransposed)
+					{
+						size_t matrix2ActualRows = other.actualRows;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[i * matrix1ActualCols + j] = data2[j * matrix2ActualRows + i];
+							}
+						}
+					}
+					else
+					{
+						size_t matrix2ActualCols = other.actualCols;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[i * matrix1ActualCols + j] = data2[i * matrix2ActualCols + j];
+							}
+						}
+					}
+				}
+			}
+			return *this;
 		}
 
 		// Set constant
@@ -26811,12 +26985,27 @@ namespace matrix
 	class matrix<uint8_t, thisTransposed, thisContiguous>
 	{
 	public:
+		inline matrix() :
+			_data(nullptr),
+			dataToDelete(nullptr),
+			_rows(0),
+			_cols(0),
+			_size(0),
+			actualRows(0),
+			actualCols(0),
+			finalPosSize(0),
+			finalPosRows(0),
+			finalPosCols(0),
+			finalPosSize256(0),
+			finalPosActualRows256(0),
+			finalPosActualCols256(0) {}
+
 		inline matrix(size_t rows, size_t cols) : 
 			_data(new uint8_t[rows * cols]), 
 			dataToDelete(_data),
 			_rows(rows), 
 			_cols(cols), 
-			_size(rows* cols),
+			_size(rows * cols),
 			actualRows(rows), 
 			actualCols(cols), 
 			finalPosSize((_size / 32) * 32),
@@ -26831,7 +27020,7 @@ namespace matrix
 			dataToDelete(nullptr),
 			_rows(rows),
 			_cols(cols),
-			_size(rows* cols),
+			_size(rows * cols),
 			actualRows(actualRows),
 			actualCols(actualCols),
 			finalPosSize((_size / 32) * 32),
@@ -26964,6 +27153,167 @@ namespace matrix
 			{
 				return this->_data[row * this->actualCols + col];
 			}
+		}
+
+		// Copy
+
+		template<bool returnTransposed = false>
+		inline matrix<uint8_t> copy()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			uint8_t* data1 = this->_data;
+
+			matrix<uint8_t> result(rows, cols);
+
+			uint8_t* dataResult = result._data;
+
+			if constexpr (thisTransposed)
+			{
+				size_t actualRows = this->actualRows;
+				if constexpr (returnTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[j * rows + i] = data1[j * actualRows + i];
+						}
+					}
+				}
+				else
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[j * actualRows + i];
+						}
+					}
+				}
+			}
+			else
+			{
+				size_t actualCols = this->actualCols;
+				if constexpr (returnTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[j * rows + i] = data1[i * actualCols + j];
+						}
+					}
+				}
+				else
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j];
+						}
+					}
+				}
+			}
+			return result;
+		}
+
+		// = 
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline matrix<uint8_t, thisTransposed, thisContiguous>& operator=(matrix<uint8_t, otherTransposed, otherContiguous>& other)
+		{
+			if (this->_data == nullptr)
+			{
+#ifdef _DEBUG
+				if (other.dataToDelete == nullptr) throw std::invalid_argument("Error");
+#else
+#endif
+				this->_data = other._data;
+				this->dataToDelete = this->_data;
+				other.dataToDelete = nullptr;
+				this->_size = other._size;
+				this->_rows = other._rows;
+				this->_cols = other._cols;
+				this->finalPosCols = other.finalPosCols;
+				this->finalPosRows = other.finalPosRows;
+				this->finalPosSize = other.finalPosSize;
+				this->finalPosActualCols256 = other.finalPosActualCols256;
+				this->finalPosActualRows256 = other.finalPosActualRows256;
+				this->finalPosActualSize256 = other.finalPosActualSize256;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
+#else
+#endif
+				size_t rows = this->_rows;
+				size_t cols = this->_cols;
+
+				uint8_t* data1 = this->_data;
+				uint8_t* data2 = other._data;
+
+				if constexpr (thisTransposed)
+				{
+					size_t matrix1ActualRows = this->actualRows;
+					if constexpr (otherTransposed)
+					{
+						size_t matrix2ActualRows = other.actualRows;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[j * matrix1ActualRows + i] = data2[j * matrix2ActualRows + i];
+							}
+						}
+					}
+					else
+					{
+						size_t matrix2ActualCols = other.actualCols;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[j * matrix1ActualRows + i] = data2[i * matrix2ActualCols + j];
+							}
+						}
+					}
+				}
+				else
+				{
+					size_t matrix1ActualCols = this->actualCols;
+					if constexpr (otherTransposed)
+					{
+						size_t matrix2ActualRows = other.actualRows;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[i * matrix1ActualCols + j] = data2[j * matrix2ActualRows + i];
+							}
+						}
+					}
+					else
+					{
+						size_t matrix2ActualCols = other.actualCols;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[i * matrix1ActualCols + j] = data2[i * matrix2ActualCols + j];
+							}
+						}
+					}
+				}
+			}
+			return *this;
 		}
 
 		// Set constant
@@ -27927,12 +28277,24 @@ namespace matrix
 	{
 	public:
 
+		inline matrix() :
+			_data(nullptr),
+			dataToDelete(nullptr),
+			_rows(0),
+			_cols(0),
+			_size(0),
+			actualRows(0),
+			actualCols(0),
+			finalPosRows(0),
+			finalPosCols(0),
+			finalPosSize(0) {}
+
 		inline matrix(size_t rows, size_t cols) :
 			_data(new float[rows * cols]), 
 			dataToDelete(_data),
 			_rows(rows),
 			_cols(cols),
-			_size(rows* cols),
+			_size(rows * cols),
 			actualRows(rows),
 			actualCols(cols),
 			finalPosRows((_rows / 8) * 8),
@@ -27944,7 +28306,7 @@ namespace matrix
 			dataToDelete(nullptr),
 			_rows(rows),
 			_cols(cols),
-			_size(rows* cols),
+			_size(rows * cols),
 			actualRows(actualRows),
 			actualCols(actualCols),
 			finalPosRows((_rows / 8) * 8),
@@ -28129,6 +28491,164 @@ namespace matrix
 					}
 				}
 			}
+		}
+
+		// Copy
+
+		template<bool returnTransposed = false>
+		inline matrix<float> copy()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			float* data1 = this->_data;
+
+			matrix<float> result(rows, cols);
+
+			float* dataResult = result._data;
+
+			if constexpr (thisTransposed)
+			{
+				size_t actualRows = this->actualRows;
+				if constexpr (returnTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[j * rows + i] = data1[j * actualRows + i];
+						}
+					}
+				}
+				else
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[j * actualRows + i];
+						}
+					}
+				}
+			}
+			else
+			{
+				size_t actualCols = this->actualCols;
+				if constexpr (returnTransposed)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[j * rows + i] = data1[i * actualCols + j];
+						}
+					}
+				}
+				else
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j];
+						}
+					}
+				}
+			}
+			return result;
+		}
+
+		// =
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline matrix<float, thisTransposed, thisContiguous>& operator=(matrix<float, otherTransposed, otherContiguous>& other)
+		{
+			if (this->_data == nullptr)
+			{
+#ifdef _DEBUG
+				if (other.dataToDelete == nullptr) throw std::invalid_argument("Error");
+#else
+#endif
+				this->_data = other._data;
+				this->dataToDelete = this->_data;
+				other.dataToDelete = nullptr;
+				this->_size = other._size;
+				this->_rows = other._rows;
+				this->_cols = other._cols;
+				this->finalPosCols = other.finalPosCols;
+				this->finalPosRows = other.finalPosRows;
+				this->finalPosSize = other.finalPosSize;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
+#else
+#endif
+				size_t rows = this->_rows;
+				size_t cols = this->_cols;
+
+				float* data1 = this->_data;
+				float* data2 = other._data;
+
+				if constexpr (thisTransposed)
+				{
+					size_t matrix1ActualRows = this->actualRows;
+					if constexpr (otherTransposed)
+					{
+						size_t matrix2ActualRows = other.actualRows;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[j * matrix1ActualRows + i] = data2[j * matrix2ActualRows + i];
+							}
+						}
+					}
+					else
+					{
+						size_t matrix2ActualCols = other.actualCols;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[j * matrix1ActualRows + i] = data2[i * matrix2ActualCols + j];
+							}
+						}
+					}
+				}
+				else
+				{
+					size_t matrix1ActualCols = this->actualCols;
+					if constexpr (otherTransposed)
+					{
+						size_t matrix2ActualRows = other.actualRows;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[i * matrix1ActualCols + j] = data2[j * matrix2ActualRows + i];
+							}
+						}
+					}
+					else
+					{
+						size_t matrix2ActualCols = other.actualCols;
+
+						for (size_t i = 0; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								data1[i * matrix1ActualCols + j] = data2[i * matrix2ActualCols + j];
+							}
+						}
+					}
+				}
+			}
+			return *this;
 		}
 
 		// Set constant
