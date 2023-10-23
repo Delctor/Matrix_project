@@ -400,7 +400,7 @@ namespace matrix
 
 			T* dataResult = result._data;
 
-			if constexpr (std::is_same<T, double>)
+			if constexpr (std::is_same<T, double>::value)
 			{
 				size_t finalPos = (this->_size / 4) * 4;
 				__m256d zero = _mm256_setzero_pd();
@@ -415,7 +415,7 @@ namespace matrix
 					dataResult[i] = data1[i] ? 1.0 : 0.0;
 				}
 			}
-			else if constexpr (std::is_same<T, float>)
+			else if constexpr (std::is_same<T, float>::value)
 			{
 				size_t finalPos = (this->_size / 8) * 8;
 				__m256 zero = _mm256_setzero_ps();
@@ -430,7 +430,7 @@ namespace matrix
 					dataResult[i] = data1[i] ? 1.0f : 0.0f;
 				}
 			}
-			else if constexpr (std::is_same<T, uint64_t>)
+			else if constexpr (std::is_same<T, uint64_t>::value)
 			{
 				size_t finalPos = (this->_size / 4) * 4;
 				__m256i zero = _mm256_setzero_si256();
@@ -445,7 +445,7 @@ namespace matrix
 					dataResult[i] = data1[i] ? 1 : 0;
 				}
 			}
-			else if constexpr (std::is_same<T, int>)
+			else if constexpr (std::is_same<T, int>::value)
 			{
 				size_t finalPos = (this->_size / 8) * 8;
 				__m256i zero = _mm256_setzero_si256();
@@ -1887,7 +1887,7 @@ namespace matrix
 
 			T* dataResult = result._data;
 
-			if constexpr (std::is_same<T, double>)
+			if constexpr (std::is_same<T, double>::value)
 			{
 				masks_uint64_to_double;
 				for (size_t i = 0; i < finalPos; i += 4)
@@ -1895,14 +1895,22 @@ namespace matrix
 					uint64_to_double(_mm256_loadu_epi64(&data1[i]));
 					_mm256_store_pd(&dataResult[i], uint64ToDouble);
 				}
+				for (size_t i = finalPos; i < size; i++)
+				{
+					dataResult[i] = static_cast<double>(data1[i]);
+				}
 			}
-			else if constexpr (std::is_same<T, int>)
+			else if constexpr (std::is_same<T, int>::value)
 			{
 				__m256i indices = _mm256_setr_epi32(0, 2, 4, 6, 7, 5, 3, 1);
 
 				for (size_t i = 0; i < finalPos; i += 4)
 				{
 					_mm_storeu_epi32(&dataResult[i], _mm256_castsi256_si128(_mm256_permutevar8x32_epi32(_mm256_loadu_epi64(&data1[i]), indices)));
+				}
+				for (size_t i = finalPos; i < size; i++)
+				{
+					dataResult[i] = static_cast<int>(data1[i]);
 				}
 			}
 			else if constexpr (std::is_same<T, uint8_t>::value)
@@ -4508,7 +4516,7 @@ namespace matrix
 					dataResult[i] = static_cast<T>(data1[i]);
 				}
 			}
-			return dataResult;
+			return result;
 		}
 
 	private:
@@ -8306,7 +8314,7 @@ namespace matrix
 
 			T* dataResult = result._data;
 
-			if constexpr (std::is_same<T, uint64_t>)
+			if constexpr (std::is_same<T, uint64_t>::value)
 			{
 				size_t finalPos = (this->_size / 4) * 4;
 				for (size_t i = 0; i < finalPos; i += 4)
@@ -8318,7 +8326,7 @@ namespace matrix
 					dataResult[i] = static_cast<uint64_t>(data1[i]);
 				}
 			}
-			else if constexpr (std::is_same<T, float>)
+			else if constexpr (std::is_same<T, float>::value)
 			{
 				size_t finalPos = this->finalPos;
 				for (size_t i = 0; i < finalPos; i += 8)
@@ -8330,7 +8338,7 @@ namespace matrix
 					dataResult[i] = static_cast<float>(data1[i]);
 				}
 			}
-			else if constexpr (std::is_same<T, double>)
+			else if constexpr (std::is_same<T, double>::value)
 			{
 				size_t finalPos = (this->_size / 4) * 4;
 				for (size_t i = 0; i < finalPos; i += 4)
@@ -41631,7 +41639,7 @@ namespace matrix
 
 			T* dataResult = result._data;
 
-			if constexpr (std::is_same<T, int>)
+			if constexpr (std::is_same<T, int>::value)
 			{
 				if constexpr (thisTransposed)
 				{
@@ -41665,7 +41673,7 @@ namespace matrix
 					}
 				}
 			}
-			else if constexpr (std::is_same<T, double>)
+			else if constexpr (std::is_same<T, double>::value)
 			{
 				if constexpr (thisTransposed)
 				{
