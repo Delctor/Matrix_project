@@ -250,6 +250,25 @@ namespace alge
 			return *this;
 		}
 
+		// Transfer
+
+		inline void transfer(vector<uint8_t>& other)
+		{
+#ifdef _DEBUG
+			if (other.dataToDelete == nullptr || (this->dataToDelete == nullptr && this->_data != nullptr)) throw std::invalid_argument("Error");
+#else
+#endif
+			delete[] this->_data;
+
+			this->_data = other._data;
+			this->dataToDelete = other._data;
+			other.dataToDelete = nullptr;
+			this->_size = other._size;
+			this->finalPos = other.finalPos;
+			this->finalPos256 = other.finalPos256;
+		}
+
+
 		// &&
 
 		inline vector<uint8_t> operator&&(vector<uint8_t>& other)
@@ -669,6 +688,23 @@ namespace alge
 				}
 			}
 			return *this;
+		}
+
+		// Transfer
+
+		inline void transfer(vector<uint64_t>& other)
+		{
+#ifdef _DEBUG
+			if (other.dataToDelete == nullptr || (this->dataToDelete == nullptr && this->_data != nullptr)) throw std::invalid_argument("Error");
+#else
+#endif
+			delete[] this->_data;
+
+			this->_data = other._data;
+			this->dataToDelete = other._data;
+			other.dataToDelete = nullptr;
+			this->_size = other._size;
+			this->finalPos = other.finalPos;
 		}
 
 		// Set Constant
@@ -2146,6 +2182,8 @@ namespace alge
 
 		inline double* data() { return this->_data; }
 
+		inline size_t size() { return this->_size; }
+
 		// Block
 
 		inline vector<double> block(size_t initial, size_t final)
@@ -2204,7 +2242,24 @@ namespace alge
 			}
 			return *this;
 		}
-	
+		
+		// Transfer
+
+		inline void transfer(vector<double>& other)
+		{
+#ifdef _DEBUG
+			if (other.dataToDelete == nullptr || (this->dataToDelete == nullptr && this->_data != nullptr)) throw std::invalid_argument("Error");
+#else
+#endif
+			delete[] this->_data;
+
+			this->_data = other._data;
+			this->dataToDelete = other._data;
+			other.dataToDelete = nullptr;
+			this->_size = other._size;
+			this->finalPos = other.finalPos;
+		}
+
 		// Set Constant
 
 		inline void set_const(double num)
@@ -4867,6 +4922,21 @@ namespace alge
 			return *this;
 		}
 
+		inline void transfer(vector<float>& other)
+		{
+#ifdef _DEBUG
+			if (other.dataToDelete == nullptr || (this->dataToDelete == nullptr && this->_data != nullptr)) throw std::invalid_argument("Error");
+#else
+#endif
+			delete[] this->_data;
+
+			this->_data = other._data;
+			this->dataToDelete = other._data;
+			other.dataToDelete = nullptr;
+			this->_size = other._size;
+			this->finalPos = other.finalPos;
+		}
+
 		// neg
 
 		inline vector<float> operator-()
@@ -7512,6 +7582,21 @@ namespace alge
 			return *this;
 		}
 
+		inline void transfer(vector<int>& other)
+		{
+#ifdef _DEBUG
+			if (other.dataToDelete == nullptr || (this->dataToDelete == nullptr && this->_data != nullptr)) throw std::invalid_argument("Error");
+#else
+#endif
+			delete[] this->_data;
+
+			this->_data = other._data;
+			this->dataToDelete = other._data;
+			other.dataToDelete = nullptr;
+			this->_size = other._size;
+			this->finalPos = other.finalPos;
+		}
+
 		// neg
 
 		inline vector<int> operator-()
@@ -8939,6 +9024,24 @@ namespace alge
 		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
 		friend inline matrix<uint8_t> operator<=(double, matrix<double, thisTransposed, thisContiguous>&);
 
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous>
+		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, double, double);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous, bool matrx3Transposed, bool matrix3Contiguous>
+		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, matrix<double, matrx2Transposed, matrix2Contiguous>&, matrix<double, matrx3Transposed, matrix3Contiguous>&);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous>
+		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, matrix<double, matrx2Transposed, matrix2Contiguous>&, double);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous>
+		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, double, matrix<double, matrx2Transposed, matrix2Contiguous>&);
+
+		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
+		friend inline matrix<double> clip(matrix<double, thisTransposed, thisContiguous>&, double, double);
+
 		//----------------
 
 		inline size_t rows() { return this->_rows; }
@@ -9207,6 +9310,30 @@ namespace alge
 				}
 			}
 			return *this;
+		}
+
+		// Transfer
+
+		template<bool otherContiguous>
+		inline void transfer(matrix<double, thisTransposed, otherContiguous>& other)
+		{
+#ifdef _DEBUG
+			if (other.dataToDelete == nullptr || (this->dataToDelete == nullptr && this->_data != nullptr)) throw std::invalid_argument("Error");
+#else
+#endif
+			delete[] this->_data;
+
+			this->_data = other._data;
+			this->dataToDelete = other._data;
+			other.dataToDelete = nullptr;
+			this->_cols = other._cols;
+			this->_rows = other._rows;
+			this->_size = other._size;
+			this->actualCols = other.actualCols;
+			this->actualRows = other.actualRows;
+			this->finalPosCols = other.finalPosCols;
+			this->finalPosRows = other.finalPosRows;
+			this->finalPosSize = other.finalPosSize;
 		}
 
 		// neg
@@ -10107,10 +10234,10 @@ namespace alge
 							for (size_t i = 0; i < finalPosRows; i += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
-								__m256d b = _mm256_setr_pd(data1[i * matrix2ActualCols + j],
-									data1[(i + 1) * matrix2ActualCols + j],
-									data1[(i + 2) * matrix2ActualCols + j],
-									data1[(i + 3) * matrix2ActualCols + j]);
+								__m256d b = _mm256_setr_pd(data2[i * matrix2ActualCols + j],
+									data2[(i + 1) * matrix2ActualCols + j],
+									data2[(i + 2) * matrix2ActualCols + j],
+									data2[(i + 3) * matrix2ActualCols + j]);
 
 								__m256d add = _mm256_add_pd(a, b);
 
@@ -11221,10 +11348,10 @@ namespace alge
 							for (size_t i = 0; i < finalPosRows; i += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
-								__m256d b = _mm256_setr_pd(data1[i * matrix2ActualCols + j],
-									data1[(i + 1) * matrix2ActualCols + j],
-									data1[(i + 2) * matrix2ActualCols + j],
-									data1[(i + 3) * matrix2ActualCols + j]);
+								__m256d b = _mm256_setr_pd(data2[i * matrix2ActualCols + j],
+									data2[(i + 1) * matrix2ActualCols + j],
+									data2[(i + 2) * matrix2ActualCols + j],
+									data2[(i + 3) * matrix2ActualCols + j]);
 
 								__m256d sub = _mm256_sub_pd(a, b);
 
@@ -12335,10 +12462,10 @@ namespace alge
 							for (size_t i = 0; i < finalPosRows; i += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
-								__m256d b = _mm256_setr_pd(data1[i * matrix2ActualCols + j],
-									data1[(i + 1) * matrix2ActualCols + j],
-									data1[(i + 2) * matrix2ActualCols + j],
-									data1[(i + 3) * matrix2ActualCols + j]);
+								__m256d b = _mm256_setr_pd(data2[i * matrix2ActualCols + j],
+									data2[(i + 1) * matrix2ActualCols + j],
+									data2[(i + 2) * matrix2ActualCols + j],
+									data2[(i + 3) * matrix2ActualCols + j]);
 
 								__m256d mul = _mm256_mul_pd(a, b);
 
@@ -13449,10 +13576,10 @@ namespace alge
 							for (size_t i = 0; i < finalPosRows; i += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
-								__m256d b = _mm256_setr_pd(data1[i * matrix2ActualCols + j],
-									data1[(i + 1) * matrix2ActualCols + j],
-									data1[(i + 2) * matrix2ActualCols + j],
-									data1[(i + 3) * matrix2ActualCols + j]);
+								__m256d b = _mm256_setr_pd(data2[i * matrix2ActualCols + j],
+									data2[(i + 1) * matrix2ActualCols + j],
+									data2[(i + 2) * matrix2ActualCols + j],
+									data2[(i + 3) * matrix2ActualCols + j]);
 
 								__m256d div = _mm256_div_pd(a, b);
 
@@ -21504,6 +21631,373 @@ namespace alge
 			}
 		}
 
+		template<bool returnTransposed = false>
+		inline matrix<double> ceil()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			double* data1 = this->_data;
+
+			matrix<double> result(rows, cols);
+
+			double* dataResult = result._data;
+
+			if constexpr (thisTransposed)
+			{
+				if constexpr (returnTransposed)
+				{
+					if constexpr (thisContiguous)
+					{
+						size_t finalPosSize = this->finalPosSize;
+						size_t size = this->_size;
+
+						for (size_t i = 0; i < finalPosSize; i += 4)
+						{
+							__m256d a = _mm256_load_pd(&data1[i]);
+
+							_mm256_store_pd(&dataResult[i], _mm256_round_pd(a, _MM_FROUND_CEIL));
+						}
+						for (size_t i = finalPosSize; i < size; i++)
+						{
+							dataResult[i] = std::ceil(data1[i]);
+						}
+					}
+					else
+					{
+						size_t matrix1ActualRows = this->actualRows;
+
+						size_t finalPosRows = this->finalPosRows;
+						size_t finalPosCols = this->finalPosCols;
+
+						for (size_t i = 0; i < finalPosRows; i += 4)
+						{
+							for (size_t j = 0; j < finalPosCols; j++)
+							{
+								__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
+
+								_mm256_store_pd(&dataResult[j * rows + i], _mm256_round_pd(a, _MM_FROUND_CEIL));
+							}
+						}
+						for (size_t i = finalPosRows; i < rows; i++)
+						{
+							for (size_t j = 0; j < finalPosCols; j += 4)
+							{
+								__m256d a = _mm256_setr_pd(data1[j * matrix1ActualRows + i],
+									data1[(j + 1) * matrix1ActualRows + i],
+									data1[(j + 2) * matrix1ActualRows + i],
+									data1[(j + 3) * matrix1ActualRows + i]);
+
+								__m256d exp = _mm256_round_pd(a, _MM_FROUND_CEIL);
+
+								__m128d val1 = _mm256_extractf128_pd(exp, 1);
+								__m128d val2 = _mm256_castpd256_pd128(exp);
+
+								_mm_store_sd(&dataResult[j * rows + i], val2);
+								val2 = _mm_shuffle_pd(val2, val2, 1);
+								_mm_store_sd(&dataResult[(j + 1) * rows + i], val2);
+
+								_mm_store_sd(&dataResult[(j + 2) * rows + i], val1);
+								val1 = _mm_shuffle_pd(val1, val1, 1);
+								_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
+							}
+							for (size_t j = finalPosCols; j < cols; j++)
+							{
+								dataResult[j * rows + i] = std::ceil(data1[j * matrix1ActualRows + i]);
+							}
+						}
+					}
+				}
+				else
+				{
+					size_t matrix1ActualRows = this->actualRows;
+
+					size_t finalPosCols = this->finalPosCols;
+					size_t finalPosRows = this->finalPosRows;
+
+					for (size_t j = 0; j < finalPosCols; j += 4)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256d a = _mm256_setr_pd(data1[j * matrix1ActualRows + i],
+								data1[(j + 1) * matrix1ActualRows + i],
+								data1[(j + 2) * matrix1ActualRows + i],
+								data1[(j + 3) * matrix1ActualRows + i]);
+							_mm256_store_pd(&dataResult[i * cols + j], _mm256_round_pd(a, _MM_FROUND_CEIL));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < finalPosRows; i += 4)
+						{
+							__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
+
+							__m256d exp = _mm256_round_pd(a, _MM_FROUND_CEIL);
+
+							__m128d val1 = _mm256_extractf128_pd(exp, 1);
+							__m128d val2 = _mm256_castpd256_pd128(exp);
+
+							_mm_store_sd(&dataResult[i * cols + j], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&dataResult[(i + 1) * cols + j], val2);
+
+							_mm_store_sd(&dataResult[(i + 2) * cols + j], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&dataResult[(i + 3) * cols + j], val1);
+						}
+						for (size_t i = finalPosRows; i < cols; i++)
+						{
+							dataResult[i * cols + j] = std::ceil(data1[j * matrix1ActualRows + i]);
+						}
+					}
+				}
+			}
+			else
+			{
+				if constexpr (returnTransposed)
+				{
+					size_t matrix1ActualCols = this->actualCols;
+
+					size_t finalPosRows = this->finalPosRows;
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < finalPosRows; i += 4)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
+								data1[(i + 1) * matrix1ActualCols + j],
+								data1[(i + 2) * matrix1ActualCols + j],
+								data1[(i + 3) * matrix1ActualCols + j]);
+
+							_mm256_store_pd(&dataResult[j * rows + i], _mm256_round_pd(a, _MM_FROUND_CEIL));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
+
+							__m256d exp = _mm256_round_pd(a, _MM_FROUND_CEIL);
+
+							__m128d val1 = _mm256_extractf128_pd(exp, 1);
+							__m128d val2 = _mm256_castpd256_pd128(exp);
+
+							_mm_store_sd(&dataResult[j * rows + i], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&dataResult[(j + 1) * rows + i], val2);
+
+							_mm_store_sd(&dataResult[(j + 2) * rows + i], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							dataResult[j * rows + i] = std::ceil(data1[i * matrix1ActualCols + j]);
+						}
+					}
+				}
+				else
+				{
+					if constexpr (thisContiguous)
+					{
+						size_t size = this->_size;
+						size_t finalPosSize = this->finalPosSize;
+
+						for (size_t i = 0; i < finalPosSize; i += 4)
+						{
+							__m256d a = _mm256_load_pd(&data1[i]);
+							_mm256_store_pd(&dataResult[i], _mm256_round_pd(a, _MM_FROUND_CEIL));
+						}
+						for (size_t i = finalPosSize; i < size; i++)
+						{
+							dataResult[i] = std::ceil(data1[i]);
+						}
+					}
+					else
+					{
+						size_t matrix1ActualCols = this->actualCols;
+
+						size_t finalPosCols = this->finalPosCols;
+						size_t finalPosRows = this->finalPosRows;
+
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							for (size_t i = 0; i < rows; i++)
+							{
+								__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
+
+								_mm256_store_pd(&dataResult[i * cols + j], _mm256_round_pd(a, _MM_FROUND_CEIL));
+							}
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							for (size_t i = 0; i < finalPosRows; i += 4)
+							{
+								__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
+									data1[(i + 1) * matrix1ActualCols + j],
+									data1[(i + 2) * matrix1ActualCols + j],
+									data1[(i + 3) * matrix1ActualCols + j]);
+
+								__m256d exp = _mm256_round_pd(a, _MM_FROUND_CEIL);
+
+								__m128d val1 = _mm256_extractf128_pd(exp, 1);
+								__m128d val2 = _mm256_castpd256_pd128(exp);
+
+								_mm_store_sd(&dataResult[i * cols + j], val2);
+								val2 = _mm_shuffle_pd(val2, val2, 1);
+								_mm_store_sd(&dataResult[(i + 1) * cols + j], val2);
+
+								_mm_store_sd(&dataResult[(i + 2) * cols + j], val1);
+								val1 = _mm_shuffle_pd(val1, val1, 1);
+								_mm_store_sd(&dataResult[(i + 3) * cols + j], val1);
+							}
+							for (size_t i = finalPosRows; i < rows; i++)
+							{
+								dataResult[i * cols + j] = std::ceil(data1[i * matrix1ActualCols + j]);
+							}
+						}
+					}
+				}
+			}
+			return result;
+		}
+
+		inline void self_CEIL()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			double* data1 = this->_data;
+
+			if constexpr (thisTransposed)
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t finalPosSize = this->finalPosSize;
+					size_t size = this->_size;
+
+					for (size_t i = 0; i < finalPosSize; i += 4)
+					{
+						__m256d a = _mm256_load_pd(&data1[i]);
+
+						_mm256_store_pd(&data1[i], _mm256_round_pd(a, _MM_FROUND_CEIL));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						data1[i] = std::ceil(data1[i]);
+					}
+				}
+				else
+				{
+					size_t matrix1ActualRows = this->actualRows;
+
+					size_t finalPosRows = this->finalPosRows;
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < finalPosRows; i += 4)
+					{
+						for (size_t j = 0; j < finalPosCols; j++)
+						{
+							__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
+
+							_mm256_store_pd(&data1[j * matrix1ActualRows + i], _mm256_round_pd(a, _MM_FROUND_CEIL));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							__m256d a = _mm256_setr_pd(data1[j * matrix1ActualRows + i],
+								data1[(j + 1) * matrix1ActualRows + i],
+								data1[(j + 2) * matrix1ActualRows + i],
+								data1[(j + 3) * matrix1ActualRows + i]);
+
+							__m256d exp = _mm256_round_pd(a, _MM_FROUND_CEIL);
+
+							__m128d val1 = _mm256_extractf128_pd(exp, 1);
+							__m128d val2 = _mm256_castpd256_pd128(exp);
+
+							_mm_store_sd(&data1[j * matrix1ActualRows + i], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&data1[(j + 1) * matrix1ActualRows + i], val2);
+
+							_mm_store_sd(&data1[(j + 2) * matrix1ActualRows + i], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&data1[(j + 3) * matrix1ActualRows + i], val1);
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							data1[j * matrix1ActualRows + i] = std::ceil(data1[j * matrix1ActualRows + i]);
+						}
+					}
+				}
+			}
+			else
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t size = this->_size;
+					size_t finalPosSize = this->finalPosSize;
+
+					for (size_t i = 0; i < finalPosSize; i += 4)
+					{
+						__m256d a = _mm256_load_pd(&data1[i]);
+						_mm256_store_pd(&data1[i], _mm256_round_pd(a, _MM_FROUND_CEIL));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						data1[i] = std::ceil(data1[i]);
+					}
+				}
+				else
+				{
+					size_t matrix1ActualCols = this->actualCols;
+
+					size_t finalPosCols = this->finalPosCols;
+					size_t finalPosRows = this->finalPosRows;
+
+					for (size_t j = 0; j < finalPosCols; j += 4)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
+
+							_mm256_store_pd(&data1[i * matrix1ActualCols + j], _mm256_round_pd(a, _MM_FROUND_CEIL));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < finalPosRows; i += 4)
+						{
+							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
+								data1[(i + 1) * matrix1ActualCols + j],
+								data1[(i + 2) * matrix1ActualCols + j],
+								data1[(i + 3) * matrix1ActualCols + j]);
+
+							__m256d exp = _mm256_round_pd(a, _MM_FROUND_CEIL);
+
+							__m128d val1 = _mm256_extractf128_pd(exp, 1);
+							__m128d val2 = _mm256_castpd256_pd128(exp);
+
+							_mm_store_sd(&data1[i * matrix1ActualCols + j], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&data1[(i + 1) * matrix1ActualCols + j], val2);
+
+							_mm_store_sd(&data1[(i + 2) * matrix1ActualCols + j], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&data1[(i + 3) * matrix1ActualCols + j], val1);
+						}
+						for (size_t i = finalPosRows; i < rows; i++)
+						{
+							data1[i * matrix1ActualCols + j] = std::ceil(data1[i * matrix1ActualCols + j]);
+						}
+					}
+				}
+			}
+		}
+
 		// pow
 
 		template<bool returnTransposed = false>
@@ -21966,10 +22460,10 @@ namespace alge
 							for (size_t i = 0; i < finalPosRows; i += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
-								__m256d b = _mm256_setr_pd(data1[i * matrix2ActualCols + j],
-									data1[(i + 1) * matrix2ActualCols + j],
-									data1[(i + 2) * matrix2ActualCols + j],
-									data1[(i + 3) * matrix2ActualCols + j]);
+								__m256d b = _mm256_setr_pd(data2[i * matrix2ActualCols + j],
+									data2[(i + 1) * matrix2ActualCols + j],
+									data2[(i + 2) * matrix2ActualCols + j],
+									data2[(i + 3) * matrix2ActualCols + j]);
 
 								__m256d pow = _mm256_pow_pd(a, b);
 
@@ -23084,10 +23578,10 @@ namespace alge
 							for (size_t i = 0; i < finalPosRows; i += 4)
 							{
 								__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
-								__m256d b = _mm256_setr_pd(data1[i * matrix2ActualCols + j],
-									data1[(i + 1) * matrix2ActualCols + j],
-									data1[(i + 2) * matrix2ActualCols + j],
-									data1[(i + 3) * matrix2ActualCols + j]);
+								__m256d b = _mm256_setr_pd(data2[i * matrix2ActualCols + j],
+									data2[(i + 1) * matrix2ActualCols + j],
+									data2[(i + 2) * matrix2ActualCols + j],
+									data2[(i + 3) * matrix2ActualCols + j]);
 
 								__m256d pow = _mm256_pow_pd(a, _mm256_div_pd(one, b));
 
@@ -27679,6 +28173,375 @@ namespace alge
 			}
 		}
 
+		// Tanh
+
+		template<bool returnTransposed = false>
+		inline matrix<double> tanh()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			double* data1 = this->_data;
+
+			matrix<double> result(rows, cols);
+
+			double* dataResult = result._data;
+
+			if constexpr (thisTransposed)
+			{
+				if constexpr (returnTransposed)
+				{
+					if constexpr (thisContiguous)
+					{
+						size_t finalPosSize = this->finalPosSize;
+						size_t size = this->_size;
+
+						for (size_t i = 0; i < finalPosSize; i += 4)
+						{
+							__m256d a = _mm256_load_pd(&data1[i]);
+
+							_mm256_store_pd(&dataResult[i], _mm256_tanh_pd(a));
+						}
+						for (size_t i = finalPosSize; i < size; i++)
+						{
+							dataResult[i] = std::tanh(data1[i]);
+						}
+					}
+					else
+					{
+						size_t matrix1ActualRows = this->actualRows;
+
+						size_t finalPosRows = this->finalPosRows;
+						size_t finalPosCols = this->finalPosCols;
+
+						for (size_t i = 0; i < finalPosRows; i += 4)
+						{
+							for (size_t j = 0; j < finalPosCols; j++)
+							{
+								__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
+
+								_mm256_store_pd(&dataResult[j * rows + i], _mm256_tanh_pd(a));
+							}
+						}
+						for (size_t i = finalPosRows; i < rows; i++)
+						{
+							for (size_t j = 0; j < finalPosCols; j += 4)
+							{
+								__m256d a = _mm256_setr_pd(data1[j * matrix1ActualRows + i],
+									data1[(j + 1) * matrix1ActualRows + i],
+									data1[(j + 2) * matrix1ActualRows + i],
+									data1[(j + 3) * matrix1ActualRows + i]);
+
+								__m256d exp = _mm256_tanh_pd(a);
+
+								__m128d val1 = _mm256_extractf128_pd(exp, 1);
+								__m128d val2 = _mm256_castpd256_pd128(exp);
+
+								_mm_store_sd(&dataResult[j * rows + i], val2);
+								val2 = _mm_shuffle_pd(val2, val2, 1);
+								_mm_store_sd(&dataResult[(j + 1) * rows + i], val2);
+
+								_mm_store_sd(&dataResult[(j + 2) * rows + i], val1);
+								val1 = _mm_shuffle_pd(val1, val1, 1);
+								_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
+							}
+							for (size_t j = finalPosCols; j < cols; j++)
+							{
+								dataResult[j * rows + i] = std::tanh(data1[j * matrix1ActualRows + i]);
+							}
+						}
+					}
+				}
+				else
+				{
+					size_t matrix1ActualRows = this->actualRows;
+
+					size_t finalPosCols = this->finalPosCols;
+					size_t finalPosRows = this->finalPosRows;
+
+					for (size_t j = 0; j < finalPosCols; j += 4)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256d a = _mm256_setr_pd(data1[j * matrix1ActualRows + i],
+								data1[(j + 1) * matrix1ActualRows + i],
+								data1[(j + 2) * matrix1ActualRows + i],
+								data1[(j + 3) * matrix1ActualRows + i]);
+							_mm256_store_pd(&dataResult[i * cols + j], _mm256_tanh_pd(a));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < finalPosRows; i += 4)
+						{
+							__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
+
+							__m256d exp = _mm256_tanh_pd(a);
+
+							__m128d val1 = _mm256_extractf128_pd(exp, 1);
+							__m128d val2 = _mm256_castpd256_pd128(exp);
+
+							_mm_store_sd(&dataResult[i * cols + j], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&dataResult[(i + 1) * cols + j], val2);
+
+							_mm_store_sd(&dataResult[(i + 2) * cols + j], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&dataResult[(i + 3) * cols + j], val1);
+						}
+						for (size_t i = finalPosRows; i < cols; i++)
+						{
+							dataResult[i * cols + j] = std::tanh(data1[j * matrix1ActualRows + i]);
+						}
+					}
+				}
+			}
+			else
+			{
+				if constexpr (returnTransposed)
+				{
+					size_t matrix1ActualCols = this->actualCols;
+
+					size_t finalPosRows = this->finalPosRows;
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < finalPosRows; i += 4)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
+								data1[(i + 1) * matrix1ActualCols + j],
+								data1[(i + 2) * matrix1ActualCols + j],
+								data1[(i + 3) * matrix1ActualCols + j]);
+
+							_mm256_store_pd(&dataResult[j * rows + i], _mm256_tanh_pd(a));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
+
+							__m256d exp = _mm256_tanh_pd(a);
+
+							__m128d val1 = _mm256_extractf128_pd(exp, 1);
+							__m128d val2 = _mm256_castpd256_pd128(exp);
+
+							_mm_store_sd(&dataResult[j * rows + i], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&dataResult[(j + 1) * rows + i], val2);
+
+							_mm_store_sd(&dataResult[(j + 2) * rows + i], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							dataResult[j * rows + i] = std::tanh(data1[i * matrix1ActualCols + j]);
+						}
+					}
+				}
+				else
+				{
+					if constexpr (thisContiguous)
+					{
+						size_t size = this->_size;
+						size_t finalPosSize = this->finalPosSize;
+
+						for (size_t i = 0; i < finalPosSize; i += 4)
+						{
+							__m256d a = _mm256_load_pd(&data1[i]);
+							_mm256_store_pd(&dataResult[i], _mm256_tanh_pd(a));
+						}
+						for (size_t i = finalPosSize; i < size; i++)
+						{
+							dataResult[i] = std::tanh(data1[i]);
+						}
+					}
+					else
+					{
+						size_t matrix1ActualCols = this->actualCols;
+
+						size_t finalPosCols = this->finalPosCols;
+						size_t finalPosRows = this->finalPosRows;
+
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							for (size_t i = 0; i < rows; i++)
+							{
+								__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
+
+								_mm256_store_pd(&dataResult[i * cols + j], _mm256_tanh_pd(a));
+							}
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							for (size_t i = 0; i < finalPosRows; i += 4)
+							{
+								__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
+									data1[(i + 1) * matrix1ActualCols + j],
+									data1[(i + 2) * matrix1ActualCols + j],
+									data1[(i + 3) * matrix1ActualCols + j]);
+
+								__m256d exp = _mm256_tanh_pd(a);
+
+								__m128d val1 = _mm256_extractf128_pd(exp, 1);
+								__m128d val2 = _mm256_castpd256_pd128(exp);
+
+								_mm_store_sd(&dataResult[i * cols + j], val2);
+								val2 = _mm_shuffle_pd(val2, val2, 1);
+								_mm_store_sd(&dataResult[(i + 1) * cols + j], val2);
+
+								_mm_store_sd(&dataResult[(i + 2) * cols + j], val1);
+								val1 = _mm_shuffle_pd(val1, val1, 1);
+								_mm_store_sd(&dataResult[(i + 3) * cols + j], val1);
+							}
+							for (size_t i = finalPosRows; i < rows; i++)
+							{
+								dataResult[i * cols + j] = std::tanh(data1[i * matrix1ActualCols + j]);
+							}
+						}
+					}
+				}
+			}
+			return result;
+		}
+
+		inline void self_tanh()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			double* data1 = this->_data;
+
+			if constexpr (thisTransposed)
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t finalPosSize = this->finalPosSize;
+					size_t size = this->_size;
+
+					for (size_t i = 0; i < finalPosSize; i += 4)
+					{
+						__m256d a = _mm256_load_pd(&data1[i]);
+
+						_mm256_store_pd(&data1[i], _mm256_tanh_pd(a));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						data1[i] = std::tanh(data1[i]);
+					}
+				}
+				else
+				{
+					size_t matrix1ActualRows = this->actualRows;
+
+					size_t finalPosRows = this->finalPosRows;
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < finalPosRows; i += 4)
+					{
+						for (size_t j = 0; j < finalPosCols; j++)
+						{
+							__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
+
+							_mm256_store_pd(&data1[j * matrix1ActualRows + i], _mm256_tanh_pd(a));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							__m256d a = _mm256_setr_pd(data1[j * matrix1ActualRows + i],
+								data1[(j + 1) * matrix1ActualRows + i],
+								data1[(j + 2) * matrix1ActualRows + i],
+								data1[(j + 3) * matrix1ActualRows + i]);
+
+							__m256d exp = _mm256_tanh_pd(a);
+
+							__m128d val1 = _mm256_extractf128_pd(exp, 1);
+							__m128d val2 = _mm256_castpd256_pd128(exp);
+
+							_mm_store_sd(&data1[j * matrix1ActualRows + i], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&data1[(j + 1) * matrix1ActualRows + i], val2);
+
+							_mm_store_sd(&data1[(j + 2) * matrix1ActualRows + i], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&data1[(j + 3) * matrix1ActualRows + i], val1);
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							data1[j * matrix1ActualRows + i] = std::tanh(data1[j * matrix1ActualRows + i]);
+						}
+					}
+				}
+			}
+			else
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t size = this->_size;
+					size_t finalPosSize = this->finalPosSize;
+
+					for (size_t i = 0; i < finalPosSize; i += 4)
+					{
+						__m256d a = _mm256_load_pd(&data1[i]);
+						_mm256_store_pd(&data1[i], _mm256_tanh_pd(a));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						data1[i] = std::tanh(data1[i]);
+					}
+				}
+				else
+				{
+					size_t matrix1ActualCols = this->actualCols;
+
+					size_t finalPosCols = this->finalPosCols;
+					size_t finalPosRows = this->finalPosRows;
+
+					for (size_t j = 0; j < finalPosCols; j += 4)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
+
+							_mm256_store_pd(&data1[i * matrix1ActualCols + j], _mm256_tanh_pd(a));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < finalPosRows; i += 4)
+						{
+							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
+								data1[(i + 1) * matrix1ActualCols + j],
+								data1[(i + 2) * matrix1ActualCols + j],
+								data1[(i + 3) * matrix1ActualCols + j]);
+
+							__m256d exp = _mm256_tanh_pd(a);
+
+							__m128d val1 = _mm256_extractf128_pd(exp, 1);
+							__m128d val2 = _mm256_castpd256_pd128(exp);
+
+							_mm_store_sd(&data1[i * matrix1ActualCols + j], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&data1[(i + 1) * matrix1ActualCols + j], val2);
+
+							_mm_store_sd(&data1[(i + 2) * matrix1ActualCols + j], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&data1[(i + 3) * matrix1ActualCols + j], val1);
+						}
+						for (size_t i = finalPosRows; i < rows; i++)
+						{
+							data1[i * matrix1ActualCols + j] = std::tanh(data1[i * matrix1ActualCols + j]);
+						}
+					}
+				}
+			}
+		}
+
 		// Cast
 
 		template <typename T>
@@ -27848,8 +28711,8 @@ namespace alge
 			finalPosRows(0),
 			finalPosCols(0),
 			finalPosSize256(0),
-			finalPosActualRows256(0),
-			finalPosActualCols256(0) {}
+			finalPosRows256(0),
+			finalPosCols256(0) {}
 
 		inline matrix(size_t rows, size_t cols) : 
 			_data(new uint8_t[rows * cols]), 
@@ -27863,8 +28726,8 @@ namespace alge
 			finalPosRows((rows / 32) * 32),
 			finalPosCols((cols / 32) * 32), 
 			finalPosSize256((_size / 256) * 256),
-			finalPosActualRows256((rows / 256) * 256),
-			finalPosActualCols256((cols / 256) * 256) {}
+			finalPosRows256((rows / 256) * 256),
+			finalPosCols256((cols / 256) * 256) {}
 
 		inline matrix(uint8_t* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols) :
 			_data(data), 
@@ -27878,8 +28741,8 @@ namespace alge
 			finalPosRows((rows / 32) * 32),
 			finalPosCols((cols / 32) * 32), 
 			finalPosSize256((_size / 256) * 256),
-			finalPosActualRows256((rows / 256) * 256),
-			finalPosActualCols256((cols / 256) * 256) {}
+			finalPosRows256((rows / 256) * 256),
+			finalPosCols256((cols / 256) * 256) {}
 
 		inline ~matrix() { delete[] this->dataToDelete; }
 
@@ -27903,6 +28766,36 @@ namespace alge
 		template<bool returnTransposed, typename T, bool matrix1Transposed, bool matrix1Contiguous,
 			bool matrix2Transposed, bool matrix2Contiguous>
 		friend inline matrix<T> concatenate_colwise(matrix<T, matrix1Transposed, matrix1Contiguous>&, matrix<T, matrix2Transposed, matrix2Contiguous>&);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous, bool matrx3Transposed, bool matrix3Contiguous>
+		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, matrix<double, matrx2Transposed, matrix2Contiguous>&, matrix<double, matrx3Transposed, matrix3Contiguous>&);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous>
+		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, matrix<double, matrx2Transposed, matrix2Contiguous>&, double);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous>
+		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, double, matrix<double, matrx2Transposed, matrix2Contiguous>&);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous>
+		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, double, double);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous, bool matrx3Transposed, bool matrix3Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, matrix<float, matrx2Transposed, matrix2Contiguous>&, matrix<float, matrx3Transposed, matrix3Contiguous>&);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, matrix<float, matrx2Transposed, matrix2Contiguous>&, float);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, float, matrix<float, matrx2Transposed, matrix2Contiguous>&);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, float, float);
 
 		inline size_t rows() { return this->_rows; };
 
@@ -28099,8 +28992,8 @@ namespace alge
 				this->finalPosCols = other.finalPosCols;
 				this->finalPosRows = other.finalPosRows;
 				this->finalPosSize = other.finalPosSize;
-				this->finalPosActualCols256 = other.finalPosActualCols256;
-				this->finalPosActualRows256 = other.finalPosActualRows256;
+				this->finalPosCols256 = other.finalPosCols256;
+				this->finalPosRows256 = other.finalPosRows256;
 				this->finalPosActualSize256 = other.finalPosActualSize256;
 			}
 			else
@@ -28173,6 +29066,33 @@ namespace alge
 				}
 			}
 			return *this;
+		}
+
+		// Transfer
+
+		template<bool otherContiguous>
+		inline void transfer(matrix<uint8_t, thisTransposed, otherContiguous>& other)
+		{
+#ifdef _DEBUG
+			if (other.dataToDelete == nullptr || (this->dataToDelete == nullptr && this->_data != nullptr)) throw std::invalid_argument("Error");
+#else
+#endif
+			delete[] this->_data;
+
+			this->_data = other._data;
+			this->dataToDelete = other._data;
+			other.dataToDelete = nullptr;
+			this->_cols = other._cols;
+			this->_rows = other._rows;
+			this->_size = other._size;
+			this->actualCols = other.actualCols;
+			this->actualRows = other.actualRows;
+			this->finalPosCols = other.finalPosCols;
+			this->finalPosRows = other.finalPosRows;
+			this->finalPosSize = other.finalPosSize;
+			this->finalPosCols256 = other.finalPosCols256;
+			this->finalPosRows256 = other.finalPosRows256;
+			this->finalPosSize256 = other.finalPosSize256;
 		}
 
 		// Set constant
@@ -28859,11 +29779,11 @@ namespace alge
 			{
 				size_t matrix1ActualRows = this->actualRows;
 
-				size_t finalPosActualRows256 = this->finalPosActualRows256;
+				size_t finalPosRows256 = this->finalPosRows256;
 
 				for (size_t j = 0; j < cols; j++)
 				{
-					for (size_t i = 0; i < finalPosActualRows256; i += 256)
+					for (size_t i = 0; i < finalPosRows256; i += 256)
 					{
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i])));
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 32])));
@@ -28874,7 +29794,7 @@ namespace alge
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 192])));
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 224])));
 					}
-					for (size_t i = finalPosActualRows256; i < rows; i++)
+					for (size_t i = finalPosRows256; i < rows; i++)
 					{
 						if (data1[j * matrix1ActualRows + i]) count++;
 					}
@@ -28886,11 +29806,11 @@ namespace alge
 
 				size_t extra_cols = matrix1ActualCols - cols;
 
-				size_t finalPosActualCols256 = this->finalPosActualCols256;
+				size_t finalPosCols256 = this->finalPosCols256;
 
 				for (size_t i = 0; i < rows; i++)
 				{
-					for (size_t j = 0; j < finalPosActualCols256; j += 256)
+					for (size_t j = 0; j < finalPosCols256; j += 256)
 					{
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j])));
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 32])));
@@ -28901,7 +29821,7 @@ namespace alge
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 192])));
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 224])));
 					}
-					for (size_t j = finalPosActualCols256; j < cols; j++)
+					for (size_t j = finalPosCols256; j < cols; j++)
 					{
 						if (data1[i * matrix1ActualCols + j]) count++;
 					}
@@ -28927,12 +29847,12 @@ namespace alge
 
 				size_t extra_rows = matrix1ActualRows - rows;
 
-				size_t finalPosActualRows256 = this->finalPosActualRows256;
+				size_t finalPosRows256 = this->finalPosRows256;
 
 				for (size_t j = 0; j < cols; j++)
 				{
 					size_t count = 0;
-					for (size_t i = 0; i < finalPosActualRows256; i += 256)
+					for (size_t i = 0; i < finalPosRows256; i += 256)
 					{
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i])));
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 32])));
@@ -28943,7 +29863,7 @@ namespace alge
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 192])));
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[j * matrix1ActualRows + i + 224])));
 					}
-					for (size_t i = finalPosActualRows256; i < rows; i++)
+					for (size_t i = finalPosRows256; i < rows; i++)
 					{
 						if (data1[j * matrix1ActualRows + i]) count++;
 					}
@@ -28999,12 +29919,12 @@ namespace alge
 
 				size_t extra_cols = matrix1ActualCols - cols;
 
-				size_t finalPosActualCols256 = this->finalPosActualCols256;
+				size_t finalPosCols256 = this->finalPosCols256;
 
 				for (size_t i = 0; i < rows; i++)
 				{
 					size_t count = 0;
-					for (size_t j = 0; j < finalPosActualCols256; j += 256)
+					for (size_t j = 0; j < finalPosCols256; j += 256)
 					{
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j])));
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 32])));
@@ -29015,7 +29935,7 @@ namespace alge
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 192])));
 						count += _mm_popcnt_u32(_mm256_movemask_epi8(_mm256_loadu_epi8(&data1[i * matrix1ActualCols + j + 224])));
 					}
-					for (size_t j = finalPosActualCols256; j < cols; j++)
+					for (size_t j = finalPosCols256; j < cols; j++)
 					{
 						if (data1[i * matrix1ActualCols + j]) count++;
 					}
@@ -29128,7 +30048,7 @@ namespace alge
 		size_t _rows, _cols, _size;
 		size_t actualRows, actualCols;
 		size_t finalPosSize, finalPosRows, finalPosCols;
-		size_t finalPosSize256, finalPosActualRows256, finalPosActualCols256;
+		size_t finalPosSize256, finalPosRows256, finalPosCols256;
 	};
 
 	template <bool thisTransposed, bool thisContiguous>
@@ -29228,6 +30148,24 @@ namespace alge
 
 		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
 		friend inline matrix<uint8_t> operator<=(float, matrix<float, thisTransposed, thisContiguous>&);
+
+		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
+		friend inline matrix<float> clip(matrix<float, thisTransposed, thisContiguous>&, float, float);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous, bool matrx3Transposed, bool matrix3Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, matrix<float, matrx2Transposed, matrix2Contiguous>&, matrix<float, matrx3Transposed, matrix3Contiguous>&);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, matrix<float, matrx2Transposed, matrix2Contiguous>&, float);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
+			, bool matrx2Transposed, bool matrix2Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, float, matrix<float, matrx2Transposed, matrix2Contiguous>&);
+
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, float, float);
 
 		//----------------
 
@@ -29546,6 +30484,30 @@ namespace alge
 				}
 			}
 			return *this;
+		}
+
+		// Transfer
+
+		template<bool otherContiguous>
+		inline void transfer(matrix<float, thisTransposed, otherContiguous>& other)
+		{
+#ifdef _DEBUG
+			if (other.dataToDelete == nullptr || (this->dataToDelete == nullptr && this->_data != nullptr)) throw std::invalid_argument("Error");
+#else
+#endif
+			delete[] this->_data;
+
+			this->_data = other._data;
+			this->dataToDelete = other._data;
+			other.dataToDelete = nullptr;
+			this->_cols = other._cols;
+			this->_rows = other._rows;
+			this->_size = other._size;
+			this->actualCols = other.actualCols;
+			this->actualRows = other.actualRows;
+			this->finalPosCols = other.finalPosCols;
+			this->finalPosRows = other.finalPosRows;
+			this->finalPosSize = other.finalPosSize;
 		}
 
 		// neg
@@ -43368,6 +44330,269 @@ namespace alge
 			}
 		}
 
+		// Tanh
+
+		template<bool returnTransposed = false>
+		inline matrix<float> tanh()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			float* data1 = this->_data;
+
+			matrix<float> result(rows, cols);
+
+			float* dataResult = result._data;
+
+			if constexpr (thisTransposed)
+			{
+				if constexpr (returnTransposed)
+				{
+					if constexpr (thisContiguous)
+					{
+						size_t finalPosSize = this->finalPosSize;
+						size_t size = this->_size;
+
+						for (size_t i = 0; i < finalPosSize; i += 8)
+						{
+							__m256 a = _mm256_load_ps(&data1[i]);
+
+							_mm256_store_ps(&dataResult[i], _mm256_tanh_ps(a));
+						}
+						for (size_t i = finalPosSize; i < size; i++)
+						{
+							dataResult[i] = std::tanh(data1[i]);
+						}
+					}
+					else
+					{
+						size_t matrix1ActualRows = this->actualRows;
+
+						size_t finalPosRows = this->finalPosRows;
+						size_t finalPosCols = this->finalPosCols;
+
+						for (size_t i = 0; i < finalPosRows; i += 8)
+						{
+							for (size_t j = 0; j < finalPosCols; j++)
+							{
+								__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
+
+								_mm256_store_ps(&dataResult[j * rows + i], _mm256_tanh_ps(a));
+							}
+						}
+						for (size_t i = finalPosRows; i < rows; i++)
+						{
+							for (size_t j = 0; j < cols; j++)
+							{
+								dataResult[j * rows + i] = std::tanh(data1[j * matrix1ActualRows + i]);
+							}
+						}
+					}
+				}
+				else
+				{
+					size_t matrix1ActualRows = this->actualRows;
+
+					size_t finalPosCols = this->finalPosCols;
+					size_t finalPosRows = this->finalPosRows;
+
+					for (size_t j = 0; j < finalPosCols; j += 8)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256 a = _mm256_setr_ps(data1[j * matrix1ActualRows + i],
+								data1[(j + 1) * matrix1ActualRows + i],
+								data1[(j + 2) * matrix1ActualRows + i],
+								data1[(j + 3) * matrix1ActualRows + i],
+								data1[(j + 4) * matrix1ActualRows + i],
+								data1[(j + 5) * matrix1ActualRows + i],
+								data1[(j + 6) * matrix1ActualRows + i],
+								data1[(j + 7) * matrix1ActualRows + i]);
+							_mm256_store_ps(&dataResult[i * cols + j], _mm256_tanh_ps(a));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < cols; i++)
+						{
+							dataResult[i * cols + j] = std::tanh(data1[j * matrix1ActualRows + i]);
+						}
+					}
+				}
+			}
+			else
+			{
+				if constexpr (returnTransposed)
+				{
+					size_t matrix1ActualCols = this->actualCols;
+
+					size_t finalPosRows = this->finalPosRows;
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < finalPosRows; i += 8)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							__m256 a = _mm256_setr_ps(data1[i * matrix1ActualCols + j],
+								data1[(i + 1) * matrix1ActualCols + j],
+								data1[(i + 2) * matrix1ActualCols + j],
+								data1[(i + 3) * matrix1ActualCols + j],
+								data1[(i + 4) * matrix1ActualCols + j],
+								data1[(i + 5) * matrix1ActualCols + j],
+								data1[(i + 6) * matrix1ActualCols + j],
+								data1[(i + 7) * matrix1ActualCols + j]);
+
+							_mm256_store_ps(&dataResult[j * rows + i], _mm256_tanh_ps(a));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; i < cols; j++)
+						{
+							dataResult[j * rows + i] = std::tanh(data1[i * matrix1ActualCols + j]);
+						}
+					}
+				}
+				else
+				{
+					if constexpr (thisContiguous)
+					{
+						size_t size = this->_size;
+						size_t finalPosSize = this->finalPosSize;
+
+						for (size_t i = 0; i < finalPosSize; i += 8)
+						{
+							__m256 a = _mm256_load_ps(&data1[i]);
+							_mm256_store_ps(&dataResult[i], _mm256_tanh_ps(a));
+						}
+						for (size_t i = finalPosSize; i < size; i++)
+						{
+							dataResult[i] = std::tanh(data1[i]);
+						}
+					}
+					else
+					{
+						size_t matrix1ActualCols = this->actualCols;
+
+						size_t finalPosCols = this->finalPosCols;
+						size_t finalPosRows = this->finalPosRows;
+
+						for (size_t j = 0; j < finalPosCols; j += 8)
+						{
+							for (size_t i = 0; i < rows; i++)
+							{
+								__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
+
+								_mm256_store_ps(&dataResult[i * cols + j], _mm256_tanh_ps(a));
+							}
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							for (size_t i = 0; i < rows; i++)
+							{
+								dataResult[i * cols + j] = std::tanh(data1[i * matrix1ActualCols + j]);
+							}
+						}
+					}
+				}
+			}
+			return result;
+		}
+
+		inline void self_tanh()
+		{
+			size_t rows = this->_rows;
+			size_t cols = this->_cols;
+
+			float* data1 = this->_data;
+
+			if constexpr (thisTransposed)
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t finalPosSize = this->finalPosSize;
+					size_t size = this->_size;
+
+					for (size_t i = 0; i < finalPosSize; i += 8)
+					{
+						__m256 a = _mm256_load_ps(&data1[i]);
+
+						_mm256_store_ps(&data1[i], _mm256_tanh_ps(a));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						data1[i] = std::tanh(data1[i]);
+					}
+				}
+				else
+				{
+					size_t matrix1ActualRows = this->actualRows;
+
+					size_t finalPosRows = this->finalPosRows;
+					size_t finalPosCols = this->finalPosCols;
+
+					for (size_t i = 0; i < finalPosRows; i += 8)
+					{
+						for (size_t j = 0; j < finalPosCols; j++)
+						{
+							__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
+
+							_mm256_store_ps(&data1[j * matrix1ActualRows + i], _mm256_tanh_ps(a));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							data1[j * matrix1ActualRows + i] = std::tanh(data1[j * matrix1ActualRows + i]);
+						}
+					}
+				}
+			}
+			else
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t size = this->_size;
+					size_t finalPosSize = this->finalPosSize;
+
+					for (size_t i = 0; i < finalPosSize; i += 8)
+					{
+						__m256 a = _mm256_load_ps(&data1[i]);
+						_mm256_store_ps(&data1[i], _mm256_tanh_ps(a));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						data1[i] = std::tanh(data1[i]);
+					}
+				}
+				else
+				{
+					size_t matrix1ActualCols = this->actualCols;
+
+					size_t finalPosCols = this->finalPosCols;
+					size_t finalPosRows = this->finalPosRows;
+
+					for (size_t j = 0; j < finalPosCols; j += 8)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
+
+							_mm256_store_ps(&data1[i * matrix1ActualCols + j], _mm256_tanh_ps(a));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							data1[i * matrix1ActualCols + j] = std::tanh(data1[i * matrix1ActualCols + j]);
+						}
+					}
+				}
+			}
+		}
+
 		// Cast
 		template<typename T>
 		inline matrix<T> cast()
@@ -43663,10 +44888,133 @@ namespace alge
 		return result;
 	}
 
+	template<bool returnTransposed = false, bool matrx1Transposed, bool matrix1Contiguous>
+	inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>& matrix1, double num1, double num2)
+	{
+		size_t rows = matrix1._rows;
+		size_t cols = matrix1._cols;
+
+		__m256d _num1 = _mm256_set1_pd(num1);
+		__m256d _num2 = _mm256_set1_pd(num2);
+
+		uint8_t* data1 = matrix1._data;
+
+		matrix<double> result(rows, cols);
+
+		double* dataResult = result._data;
+
+		if constexpr (matrx1Transposed)
+		{
+			size_t actualRows = matrix1.actualRows;
+
+			if constexpr (returnTransposed)
+			{
+				if constexpr (matrix1Contiguous)
+				{
+					size_t size = matrix1._size;
+					size_t finalPosSize = matrix1.finalPosSize;
+					for (size_t i = 0; i < finalPosSize; i += 4)
+					{
+						__m256d a = _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_castps_si128(_mm_load_ss(reinterpret_cast<float*>(&data1[i])))));
+
+						_mm256_store_pd(&dataResult[i], _mm256_blendv_pd(_num2, _num1, a));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						dataResult[i] = data1[i] ? num1 : num2;
+					}
+				}
+				else
+				{
+					size_t finalPosRows = matrix1.finalPosRows;
+
+					for (size_t i = 0; i < finalPosRows; i += 4)
+					{
+						for (size_t j = 0; j < cols; i++)
+						{
+							__m256d a = _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_castps_si128(_mm_load_ss(reinterpret_cast<float*>(&data1[j * actualRows + i])))));
+							_mm256_store_pd(&dataResult[j * rows + i], _mm256_blendv_pd(_num2, _num1, a));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; i++)
+						{
+							dataResult[j * rows + i] = data1[j * actualRows + i] ? num1 : num2;
+						}
+					}
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < cols; i++)
+					{
+						dataResult[i * cols + j] = data1[j * actualRows + i] ? num1 : num2;
+					}
+				}
+			}
+		}
+		else
+		{
+			size_t actualCols = matrix1.actualCols;
+
+			if constexpr (returnTransposed)
+			{
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < cols; i++)
+					{
+						dataResult[j * rows + i] = data1[i * actualCols + j] ? num1 : num2;
+					}
+				}
+			}
+			else
+			{
+				if constexpr (matrix1Contiguous)
+				{
+					size_t size = matrix1._size;
+					size_t finalPosSize = matrix1.finalPosSize;
+					for (size_t i = 0; i < finalPosSize; i += 4)
+					{
+						__m256d a = _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_castps_si128(_mm_load_ss(reinterpret_cast<float*>(&data1[i])))));
+
+						_mm256_store_pd(&dataResult[i], _mm256_blendv_pd(_num2, _num1, a));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						dataResult[i] = data1[i] ? num1 : num2;
+					}
+				}
+				else
+				{
+					size_t actualCols = matrix1.actualCols;
+					size_t finalPosCols = matrix1.finalPosCols;
+					for (size_t j = 0; j < finalPosCols; j += 4)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256d a = _mm256_castsi256_pd(_mm256_cvtepi8_epi64(_mm_castps_si128(_mm_load_ss(reinterpret_cast<float*>(&data1[i * actualCols + j])))));
+							_mm256_store_pd(&dataResult[i * cols + j], _mm256_blendv_pd(_num2, _num1, a));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j] ? num1 : num2;
+						}
+					}
+				}
+			}
+		}
+		return result;
+	}
+
 	// Float
 
 	inline vector<float> where(vector<uint8_t>& vector1, vector<float>& vector2, vector<float>& vector3)
-
 	{
 #ifdef _DEBUG
 		if (vector1._size != vector2._size || vector2._size != vector3._size) throw std::invalid_argument("The dimensions of both vectors must be the same");
@@ -43789,6 +45137,130 @@ namespace alge
 		for (size_t i = finalPos; i < size; i++)
 		{
 			dataResult[i] = data1[i] ? num : data2[i];
+		}
+		return result;
+	}
+
+	template<bool returnTransposed = false, bool matrx1Transposed, bool matrix1Contiguous>
+	inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>& matrix1, float num1, float num2)
+	{
+		size_t rows = matrix1._rows;
+		size_t cols = matrix1._cols;
+
+		__m256 _num1 = _mm256_set1_ps(num1);
+		__m256 _num2 = _mm256_set1_ps(num2);
+
+		uint8_t* data1 = matrix1._data;
+
+		matrix<float> result(rows, cols);
+
+		float* dataResult = result._data;
+
+		if constexpr (matrx1Transposed)
+		{
+			size_t actualRows = matrix1.actualRows;
+
+			if constexpr (returnTransposed)
+			{
+				if constexpr (matrix1Contiguous)
+				{
+					size_t size = matrix1._size;
+					size_t finalPosSize = matrix1.finalPosSize;
+					for (size_t i = 0; i < finalPosSize; i += 8)
+					{
+						__m256 a = _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_castpd_si128(_mm_load_sd(reinterpret_cast<double*>(&data1[i])))));
+
+						_mm256_store_ps(&dataResult[i], _mm256_blendv_ps(_num2, _num1, a));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						dataResult[i] = data1[i] ? num1 : num2;
+					}
+				}
+				else
+				{
+					size_t finalPosRows = matrix1.finalPosRows;
+
+					for (size_t i = 0; i < finalPosRows; i += 8)
+					{
+						for (size_t j = 0; j < cols; i++)
+						{
+							__m256 a = _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_castpd_si128(_mm_load_sd(reinterpret_cast<double*>(&data1[j * actualRows + i])))));
+							_mm256_store_ps(&dataResult[j * rows + i], _mm256_blendv_ps(_num2, _num1, a));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; i++)
+						{
+							dataResult[j * rows + i] = data1[j * actualRows + i] ? num1 : num2;
+						}
+					}
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < cols; i++)
+					{
+						dataResult[i * cols + j] = data1[j * actualRows + i] ? num1 : num2;
+					}
+				}
+			}
+		}
+		else
+		{
+			size_t actualCols = matrix1.actualCols;
+
+			if constexpr (returnTransposed)
+			{
+				for (size_t i = 0; i < rows; i++)
+				{
+					for (size_t j = 0; j < cols; i++)
+					{
+						dataResult[j * rows + i] = data1[i * actualCols + j] ? num1 : num2;
+					}
+				}
+			}
+			else
+			{
+				if constexpr (matrix1Contiguous)
+				{
+					size_t size = matrix1._size;
+					size_t finalPosSize = matrix1.finalPosSize;
+					for (size_t i = 0; i < finalPosSize; i += 8)
+					{
+						__m256 a = _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_castpd_si128(_mm_load_sd(reinterpret_cast<double*>(&data1[i])))));
+
+						_mm256_store_ps(&dataResult[i], _mm256_blendv_ps(_num2, _num1, a));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						dataResult[i] = data1[i] ? num1 : num2;
+					}
+				}
+				else
+				{
+					size_t actualCols = matrix1.actualCols;
+					size_t finalPosCols = matrix1.finalPosCols;
+					for (size_t j = 0; j < finalPosCols; j += 8)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256 a = _mm256_castsi256_ps(_mm256_cvtepi8_epi32(_mm_castpd_si128(_mm_load_sd(reinterpret_cast<double*>(&data1[i * actualCols + j])))));
+							_mm256_store_ps(&dataResult[i * cols + j], _mm256_blendv_ps(_num2, _num1, a));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							dataResult[i * cols + j] = data1[i * actualCols + j] ? num1 : num2;
+						}
+					}
+				}
+			}
 		}
 		return result;
 	}
@@ -44079,6 +45551,421 @@ namespace alge
 			{
 				dataResult[iResult] = iVector1;
 				iResult++;
+			}
+		}
+		return result;
+	}
+
+	// Clip
+
+	template<bool returnTransposed = false, bool thisTransposed, bool thisContiguous>
+	inline matrix<double> clip(matrix<double, thisTransposed, thisContiguous>& matrix1, double min, double max)
+
+	{
+		size_t rows = matrix1._rows;
+		size_t cols = matrix1._cols;
+
+		double* data1 = matrix1._data;
+
+		matrix<double> result(rows, cols);
+
+		double* dataResult = result._data;
+
+		__m256d _min = _mm256_set1_pd(min);
+		__m256d _max = _mm256_set1_pd(max);
+
+		if constexpr (thisTransposed)
+		{
+			if constexpr (returnTransposed)
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t size = matrix1._size;
+
+					size_t finalPosSize = matrix1.finalPosSize;
+
+					for (size_t i = 0; i < finalPosSize; i += 4)
+					{
+						__m256d a = _mm256_load_pd(&data1[i]);
+
+						_mm256_store_pd(&dataResult[i], _mm256_min_pd(_mm256_max_pd(a, _min), _max));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						dataResult[i] = std::min(std::max(data1[i], min), max);
+					}
+				}
+				else
+				{
+					size_t finalPosRows = matrix1.finalPosRows;
+					size_t finalPosCols = matrix1.finalPosCols;
+
+					size_t matrix1ActualRows = matrix1.actualRows;
+
+					for (size_t i = 0; i < finalPosRows; i += 4)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
+
+							_mm256_store_pd(&dataResult[j * rows + i], _mm256_min_pd(_mm256_max_pd(a, _min), _max));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < finalPosCols; j += 4)
+						{
+							__m256d a = _mm256_setr_pd(data1[j * matrix1ActualRows + i],
+								data1[(j + 1) * matrix1ActualRows + i],
+								data1[(j + 2) * matrix1ActualRows + i],
+								data1[(j + 3) * matrix1ActualRows + i]);
+
+							__m256d clip = _mm256_min_pd(_mm256_max_pd(a, _min), _max);
+
+							__m128d val1 = _mm256_extractf128_pd(clip, 1);
+							__m128d val2 = _mm256_castpd256_pd128(clip);
+
+							_mm_store_sd(&dataResult[j * rows + i], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&dataResult[(j + 1) * rows + i], val2);
+
+							_mm_store_sd(&dataResult[(j + 2) * rows + i], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
+						}
+						for (size_t j = finalPosCols; j < cols; j++)
+						{
+							dataResult[j * rows + i] = std::min(std::max(data1[j * matrix1ActualRows + i], min), max);
+						}
+					}
+				}
+			}
+			else
+			{
+				size_t finalPosCols = matrix1.finalPosCols;
+				size_t finalPosRows = matrix1.finalPosRows;
+
+				size_t matrix1ActualRows = matrix1.actualRows;
+
+				for (size_t j = 0; j < finalPosCols; j += 4)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						__m256d a = _mm256_setr_pd(data1[j * matrix1ActualRows + i],
+							data1[(j + 1) * matrix1ActualRows + i],
+							data1[(j + 2) * matrix1ActualRows + i],
+							data1[(j + 3) * matrix1ActualRows + i]);
+
+						_mm256_store_pd(&dataResult[i * cols + j], _mm256_min_pd(_mm256_max_pd(a, _min), _max));
+					}
+				}
+				for (size_t j = finalPosCols; j < cols; j++)
+				{
+					for (size_t i = 0; i < finalPosRows; i += 4)
+					{
+						__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
+
+						__m256d clip = _mm256_min_pd(_mm256_max_pd(a, _min), _max);
+
+						__m128d val1 = _mm256_extractf128_pd(clip, 1);
+						__m128d val2 = _mm256_castpd256_pd128(clip);
+
+						_mm_store_sd(&dataResult[i * cols + j], val2);
+						val2 = _mm_shuffle_pd(val2, val2, 1);
+						_mm_store_sd(&dataResult[(i + 1) * cols + j], val2);
+
+						_mm_store_sd(&dataResult[(i + 2) * cols + j], val1);
+						val1 = _mm_shuffle_pd(val1, val1, 1);
+						_mm_store_sd(&dataResult[(i + 3) * cols + j], val1);
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						dataResult[i * cols + j] = std::min(std::max(data1[j * matrix1ActualRows + i], min), max);
+					}
+				}
+			}
+		}
+		else
+		{
+			if constexpr (returnTransposed)
+			{
+				size_t matrix1ActualCols = matrix1.actualCols;
+
+				size_t finalPosRows = matrix1.finalPosRows;
+				size_t finalPosCols = matrix1.finalPosCols;
+
+				for (size_t i = 0; i < finalPosRows; i += 4)
+				{
+					for (size_t j = 0; j < cols; j++)
+					{
+						__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
+							data1[(i + 1) * matrix1ActualCols + j],
+							data1[(i + 2) * matrix1ActualCols + j],
+							data1[(i + 3) * matrix1ActualCols + j]);
+
+						_mm256_store_pd(&dataResult[j * rows + i], _mm256_min_pd(_mm256_max_pd(a, _min), _max));
+					}
+				}
+				for (size_t i = finalPosRows; i < rows; i++)
+				{
+					for (size_t j = 0; j < finalPosCols; j += 4)
+					{
+						__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
+
+						__m256d clip = _mm256_min_pd(_mm256_max_pd(a, _min), _max);
+
+						__m128d val1 = _mm256_extractf128_pd(clip, 1);
+						__m128d val2 = _mm256_castpd256_pd128(clip);
+
+						_mm_store_sd(&dataResult[j * rows + i], val2);
+						val2 = _mm_shuffle_pd(val2, val2, 1);
+						_mm_store_sd(&dataResult[(j + 1) * rows + i], val2);
+
+						_mm_store_sd(&dataResult[(j + 2) * rows + i], val1);
+						val1 = _mm_shuffle_pd(val1, val1, 1);
+						_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						dataResult[j * rows + i] = std::min(std::max(data1[i * matrix1ActualCols + j], min), max);
+					}
+				}
+			}
+			else
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t finalPosSize = matrix1.finalPosSize;
+					size_t size = matrix1._size;
+
+					for (size_t i = 0; i < finalPosSize; i += 4)
+					{
+						__m256d a = _mm256_load_pd(&data1[i]);
+
+						_mm256_store_pd(&dataResult[i], _mm256_min_pd(_mm256_max_pd(a, _min), _max));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						dataResult[i] = std::min(std::max(data1[i], min), max);
+					}
+				}
+				else
+				{
+					size_t matrix1ActualCols = matrix1.actualCols;
+
+					size_t finalPosCols = matrix1.finalPosCols;
+					size_t finalPosRows = matrix1.finalPosRows;
+
+					for (size_t j = 0; j < finalPosCols; j += 4)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
+
+							_mm256_store_pd(&dataResult[i * cols + j], _mm256_min_pd(_mm256_max_pd(a, _min), _max));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < finalPosRows; i += 4)
+						{
+							__m256d a = _mm256_setr_pd(data1[i * matrix1ActualCols + j],
+								data1[(i + 1) * matrix1ActualCols + j],
+								data1[(i + 2) * matrix1ActualCols + j],
+								data1[(i + 3) * matrix1ActualCols + j]);
+
+							__m256d clip = _mm256_min_pd(_mm256_max_pd(a, _min), _max);
+
+							__m128d val1 = _mm256_extractf128_pd(clip, 1);
+							__m128d val2 = _mm256_castpd256_pd128(clip);
+
+							_mm_store_sd(&dataResult[i * cols + j], val2);
+							val2 = _mm_shuffle_pd(val2, val2, 1);
+							_mm_store_sd(&dataResult[(i + 1) * cols + j], val2);
+
+							_mm_store_sd(&dataResult[(i + 2) * cols + j], val1);
+							val1 = _mm_shuffle_pd(val1, val1, 1);
+							_mm_store_sd(&dataResult[(i + 3) * cols + j], val1);
+						}
+						for (size_t i = finalPosRows; i < rows; i++)
+						{
+							dataResult[i * cols + j] = std::min(std::max(data1[i * matrix1ActualCols + j], min), max);
+						}
+					}
+				}
+			}
+		}
+		return result;
+	}
+
+	template<bool returnTransposed = false, bool thisTransposed, bool thisContiguous>
+	inline matrix<float> clip(matrix<float, thisTransposed, thisContiguous>& matrix1, float min, float max)
+	{
+		size_t rows = matrix1._rows;
+		size_t cols = matrix1._cols;
+
+		float* data1 = matrix1._data;
+
+		matrix<float> result(rows, cols);
+
+		float* dataResult = result._data;
+
+		__m256 _min = _mm256_set1_ps(min);
+		__m256 _max = _mm256_set1_ps(max);
+
+		if constexpr (thisTransposed)
+		{
+			if constexpr (returnTransposed)
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t size = matrix1._size;
+
+					size_t finalPosSize = matrix1.finalPosSize;
+
+					for (size_t i = 0; i < finalPosSize; i += 8)
+					{
+						__m256 a = _mm256_load_ps(&data1[i]);
+
+						_mm256_store_ps(&dataResult[i], _mm256_min_ps(_mm256_max_ps(a, _min), _max));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						dataResult[i] = std::min(std::max(data1[i], min), max);
+					}
+				}
+				else
+				{
+					size_t finalPosRows = matrix1.finalPosRows;
+					size_t finalPosCols = matrix1.finalPosCols;
+
+					size_t matrix1ActualRows = matrix1.actualRows;
+
+					for (size_t i = 0; i < finalPosRows; i += 8)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							__m256 a = _mm256_load_ps(&data1[j * matrix1ActualRows + i]);
+
+							_mm256_store_ps(&dataResult[j * rows + i], _mm256_min_ps(_mm256_max_ps(a, _min), _max));
+						}
+					}
+					for (size_t i = finalPosRows; i < rows; i++)
+					{
+						for (size_t j = 0; j < cols; j++)
+						{
+							dataResult[j * rows + i] = std::min(std::max(data1[j * matrix1ActualRows + i], min), max);
+						}
+					}
+				}
+			}
+			else
+			{
+				size_t finalPosCols = matrix1.finalPosCols;
+				size_t finalPosRows = matrix1.finalPosRows;
+
+				size_t matrix1ActualRows = matrix1.actualRows;
+
+				for (size_t j = 0; j < finalPosCols; j += 8)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						__m256 a = _mm256_setr_ps(data1[j * matrix1ActualRows + i],
+							data1[(j + 1) * matrix1ActualRows + i],
+							data1[(j + 2) * matrix1ActualRows + i],
+							data1[(j + 3) * matrix1ActualRows + i],
+							data1[(j + 4) * matrix1ActualRows + i],
+							data1[(j + 5) * matrix1ActualRows + i],
+							data1[(j + 6) * matrix1ActualRows + i],
+							data1[(j + 7) * matrix1ActualRows + i]);
+
+						_mm256_store_ps(&dataResult[i * cols + j], _mm256_min_ps(_mm256_max_ps(a, _min), _max));
+					}
+				}
+				for (size_t j = finalPosCols; j < cols; j++)
+				{
+					for (size_t i = 0; i < rows; i++)
+					{
+						dataResult[i * cols + j] = std::min(std::max(data1[j * matrix1ActualRows + i], min), max);
+					}
+				}
+			}
+		}
+		else
+		{
+			if constexpr (returnTransposed)
+			{
+				size_t matrix1ActualCols = matrix1.actualCols;
+
+				size_t finalPosRows = matrix1.finalPosRows;
+				size_t finalPosCols = matrix1.finalPosCols;
+
+				for (size_t i = 0; i < finalPosRows; i += 8)
+				{
+					for (size_t j = 0; j < cols; j++)
+					{
+						__m256 a = _mm256_setr_ps(data1[i * matrix1ActualCols + j],
+							data1[(i + 1) * matrix1ActualCols + j],
+							data1[(i + 2) * matrix1ActualCols + j],
+							data1[(i + 3) * matrix1ActualCols + j],
+							data1[(i + 4) * matrix1ActualCols + j],
+							data1[(i + 5) * matrix1ActualCols + j],
+							data1[(i + 6) * matrix1ActualCols + j],
+							data1[(i + 7) * matrix1ActualCols + j]);
+
+						_mm256_store_ps(&dataResult[j * rows + i], _mm256_min_ps(_mm256_max_ps(a, _min), _max));
+					}
+				}
+				for (size_t i = finalPosRows; i < rows; i++)
+				{
+					for (size_t j = 0; j < cols; j++)
+					{
+						dataResult[j * rows + i] = std::min(std::max(data1[i * matrix1ActualCols + j], min), max);
+					}
+				}
+			}
+			else
+			{
+				if constexpr (thisContiguous)
+				{
+					size_t finalPosSize = matrix1.finalPosSize;
+					size_t size = matrix1._size;
+
+					for (size_t i = 0; i < finalPosSize; i += 8)
+					{
+						__m256 a = _mm256_load_ps(&data1[i]);
+
+						_mm256_store_ps(&dataResult[i], _mm256_min_ps(_mm256_max_ps(a, _min), _max));
+					}
+					for (size_t i = finalPosSize; i < size; i++)
+					{
+						dataResult[i] = std::min(std::max(data1[i], min), max);
+					}
+				}
+				else
+				{
+					size_t matrix1ActualCols = matrix1.actualCols;
+
+					size_t finalPosCols = matrix1.finalPosCols;
+					size_t finalPosRows = matrix1.finalPosRows;
+
+					for (size_t j = 0; j < finalPosCols; j += 8)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							__m256 a = _mm256_load_ps(&data1[i * matrix1ActualCols + j]);
+
+							_mm256_store_ps(&dataResult[i * cols + j], _mm256_min_ps(_mm256_max_ps(a, _min), _max));
+						}
+					}
+					for (size_t j = finalPosCols; j < cols; j++)
+					{
+						for (size_t i = 0; i < rows; i++)
+						{
+							dataResult[i * cols + j] = std::min(std::max(data1[i * matrix1ActualCols + j], min), max);
+						}
+					}
+				}
 			}
 		}
 		return result;
