@@ -3,6 +3,7 @@
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+#include <initializer_list>
 #include <immintrin.h>
 
 #define uint32_to_float(v) __m256i v2 = _mm256_srli_epi32(v, 1); \
@@ -92,11 +93,42 @@ namespace alge
 	public:
 		/*I am using uint8_t to emulate bool that is why this class has no arithmetic operation methods*/
 
-		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0), finalPos256(0) {}
+		inline vector() : 
+			_data(nullptr),
+			dataToDelete(nullptr), 
+			_size(0), finalPos(0), 
+			finalPos256(0), 
+			_capacity(0) {}
 
-		inline vector(size_t size) : _data(new uint8_t[size]), dataToDelete(_data), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
+		inline vector(size_t size) : 
+			_data(new uint8_t[size]), 
+			dataToDelete(_data), _size(size), 
+			finalPos((size / 32) * 32), 
+			finalPos256((size / 256) * 256), 
+			_capacity(size) {}
 
-		inline vector(uint8_t* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 32) * 32), finalPos256((size / 256) * 256) {}
+		inline vector(uint8_t* data, size_t size) : 
+			_data(data), 
+			dataToDelete(nullptr), 
+			_size(size), 
+			finalPos((size / 32) * 32), 
+			finalPos256((size / 256) * 256), 
+			_capacity(size) {}
+
+		inline vector(std::initializer_list<uint8_t> list)
+		{
+			this->_size = list.size();
+			this->finalPos = (this->_size / 32) * 32;
+			this->finalPos256 = (this->_size / 256) * 256;
+			this->_data = new uint8_t[this->_size];
+			this->dataToDelete = this->_data;
+			this->_capacity = this->_size;
+
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				this->_data[i] = *(list.begin() + i);
+			}
+		}
 
 		inline ~vector() { delete[] this->dataToDelete; }
 
@@ -154,6 +186,12 @@ namespace alge
 
 		friend inline vector<uint64_t> where(vector<uint8_t>&);
 
+		template<typename T>
+		friend inline size_t upper_bound(vector<T>&, size_t, size_t, T);
+
+		template<typename T>
+		friend inline size_t lower_bound(vector<T>&, size_t, size_t, T);
+
 		friend std::ostream& operator<<(std::ostream& os, const vector<uint8_t>& vector);
 
 		template<typename T>
@@ -176,6 +214,231 @@ namespace alge
 		}
 
 		inline vector<uint8_t> operator[](vector<uint64_t>&);
+
+		inline size_t capacity() { return this->_capacity; }
+
+		template<bool reduceCapacity = true>
+		inline void clear()
+		{
+			if constexpr (reduceCapacity)
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+				this->finalPos256 = 0;
+				delete[] this->dataToDelete;
+				this->_data = nullptr;
+				this->dataToDelete = nullptr;
+			}
+			else
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+				this->finalPos256 = 0;
+			}
+		}
+
+		inline void reserve(size_t newCapacity)
+		{
+			uint8_t* newData = new uint8_t[newCapacity];
+			uint8_t* oldData = this->_data;
+
+			this->_size = this->_size <= newCapacity ? this->_size : newCapacity;
+			this->finalPos = (this->_size / 32) * 32;
+			this->finalPos256 = (this->_size / 256) * 256;
+			this->_capacity = newCapacity;
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				newData[i] = oldData[i];
+			}
+			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			this->_data = newData;
+			this->dataToDelete = newData;
+		}
+
+		inline void append(uint8_t num)
+		{
+			if (this->_capacity > this->_size)
+			{
+				this->_data[this->_size] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity = this->_capacity + increase;
+				uint8_t* newData = new uint8_t[this->_capacity];
+				uint8_t* oldData = this->_data;
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				newData[this->_size] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 32) * 32;
+			this->finalPos256 = (this->_size / 256) * 256;
+		}
+
+		inline void append(std::initializer_list<uint8_t> list)
+		{
+			size_t newSize = this->_size + list.size();
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = *(list.begin() + j);
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t sizeList = list.size();
+				size_t increase = this->_capacity / 2;
+				increase = increase >= sizeList ? increase : sizeList;
+
+				this->_capacity = this->_capacity + increase;
+				uint8_t* newData = new uint8_t[this->_capacity];
+				uint8_t* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = *(list.begin() + j);
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 32) * 32;
+			this->finalPos256 = (this->_size / 256) * 256;
+		}
+
+		inline void append(vector<uint8_t>& other)
+		{
+			size_t newSize = this->_size + other._size;
+
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = other._data[j];
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase >= other._size ? increase : other._size;
+
+				this->_capacity = this->_capacity + increase;
+				uint8_t* newData = new uint8_t[this->_capacity];
+				uint8_t* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = other._data[j];
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 32) * 32;
+			this->finalPos256 = (this->_size / 256) * 256;
+		}
+
+		inline void insert(uint8_t num, size_t index)
+		{
+			if (this->_capacity > this->_size)
+			{
+				uint8_t* data1 = this->_data;
+
+				uint8_t tmp = num;
+				uint8_t tmp2;
+				for (size_t i = index; i < this->_size; i++)
+				{
+					tmp2 = data1[i];
+					data1[i] = tmp;
+					tmp = tmp2;
+				}
+				data1[index] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity += increase;
+				uint8_t* newData = new uint8_t[this->_capacity];
+				uint8_t* oldData = this->_data;
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i + 1] = oldData[i];
+				}
+				newData[index] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 32) * 32;
+			this->finalPos256 = (this->_size / 256) * 256;
+		}
+
+		inline void erase(size_t index)
+		{
+			uint8_t* data1 = this->_data;
+			this->_size--;
+			this->finalPos = (this->_size / 32) * 32;
+			this->finalPos256 = (this->_size / 256) * 256;
+			if (this->dataToDelete == nullptr)
+			{
+				uint8_t* newData = new uint8_t[this->_size];
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = data1[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i] = data1[i + 1];
+				}
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+			else
+			{
+				for (size_t i = index; i < this->_size; i++)
+				{
+					data1[i] = data1[i + 1];
+				}
+			}
+		}
+
+		// Block
 
 		inline vector<uint8_t> block(size_t initial, size_t final)
 		{
@@ -556,17 +819,47 @@ namespace alge
 		uint8_t* dataToDelete;
 		size_t _size;
 		size_t finalPos, finalPos256;
+		size_t _capacity;
 	};
 
 	template <>
 	class vector<uint64_t>
 	{
 	public:
-		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
+		inline vector() : 
+			_data(nullptr), 
+			dataToDelete(nullptr), 
+			_size(0), 
+			finalPos(0), 
+			_capacity(0) {}
 
-		inline vector(size_t size) : _data(new uint64_t[size]), dataToDelete(_data), _size(size), finalPos((size / 4) * 4) {}
+		inline vector(size_t size) : 
+			_data(new uint64_t[size]), 
+			dataToDelete(_data), 
+			_size(size), 
+			finalPos((size / 4) * 4) ,
+			_capacity(size)	{}
 
-		inline vector(uint64_t* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 4) * 4) {}
+		inline vector(uint64_t* data, size_t size) : 
+			_data(data), 
+			dataToDelete(nullptr), 
+			_size(size), 
+			finalPos((size / 4) * 4), 
+			_capacity(size)	{}
+
+		inline vector(std::initializer_list<uint64_t> list)
+		{
+			this->_size = list.size();
+			this->finalPos = (this->_size / 4) * 4;
+			this->_data = new uint64_t[this->_size];
+			this->dataToDelete = this->_data;
+			this->_capacity = this->_size;
+
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				this->_data[i] = *(list.begin() + i);
+			}
+		}
 
 		inline ~vector() { delete[] this->dataToDelete; }
 
@@ -613,6 +906,12 @@ namespace alge
 		friend inline vector<uint8_t> operator<=(uint64_t, vector<uint64_t>&);
 
 		template<typename T>
+		friend inline size_t upper_bound(vector<T>&, size_t, size_t, T);
+
+		template<typename T>
+		friend inline size_t lower_bound(vector<T>&, size_t, size_t, T);
+
+		template<typename T>
 		friend inline vector<T> concatenate(vector<T>& vector1, vector<T>& vector2);
 
 		inline uint64_t* data() { return this->_data; }
@@ -629,6 +928,221 @@ namespace alge
 		{
 			uint64_t* data = this->_data;
 			return data[index];
+		}
+
+		inline size_t capacity() { return this->_capacity; }
+
+		template<bool reduceCapacity = true>
+		inline void clear()
+		{
+			if constexpr (reduceCapacity)
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+				delete[] this->dataToDelete;
+				this->_data = nullptr;
+				this->dataToDelete = nullptr;
+			}
+			else
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+			}
+		}
+
+		inline void reserve(size_t newCapacity)
+		{
+			uint64_t* newData = new uint64_t[newCapacity];
+			uint64_t* oldData = this->_data;
+
+			this->_size = this->_size <= newCapacity ? this->_size : newCapacity;
+			this->finalPos = (this->_size / 4) * 4;
+			this->_capacity = newCapacity;
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				newData[i] = oldData[i];
+			}
+			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			this->_data = newData;
+			this->dataToDelete = newData;
+		}
+
+		inline void append(uint64_t num)
+		{
+			if (this->_capacity > this->_size)
+			{
+				this->_data[this->_size] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity = this->_capacity + increase;
+				uint64_t* newData = new uint64_t[this->_capacity];
+				uint64_t* oldData = this->_data;
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				newData[this->_size] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 4) * 4;
+		}
+
+		inline void append(std::initializer_list<uint64_t> list)
+		{
+			size_t newSize = this->_size + list.size();
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = *(list.begin() + j);
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t sizeList = list.size();
+				size_t increase = this->_capacity / 2;
+				increase = increase >= sizeList ? increase : sizeList;
+
+				this->_capacity = this->_capacity + increase;
+				uint64_t* newData = new uint64_t[this->_capacity];
+				uint64_t* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = *(list.begin() + j);
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 4) * 4;
+		}
+
+		inline void append(vector<uint64_t>& other)
+		{
+			size_t newSize = this->_size + other._size;
+
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = other._data[j];
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase >= other._size ? increase : other._size;
+
+				this->_capacity = this->_capacity + increase;
+				uint64_t* newData = new uint64_t[this->_capacity];
+				uint64_t* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = other._data[j];
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 4) * 4;
+		}
+
+		inline void insert(uint64_t num, size_t index)
+		{
+			if (this->_capacity > this->_size)
+			{
+				uint64_t* data1 = this->_data;
+
+				uint64_t tmp = num;
+				uint64_t tmp2;
+				for (size_t i = index; i < this->_size; i++)
+				{
+					tmp2 = data1[i];
+					data1[i] = tmp;
+					tmp = tmp2;
+				}
+				data1[index] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity += increase;
+				uint64_t* newData = new uint64_t[this->_capacity];
+				uint64_t* oldData = this->_data;
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i + 1] = oldData[i];
+				}
+				newData[index] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 4) * 4;
+		}
+
+		inline void erase(size_t index)
+		{
+			uint64_t* data1 = this->_data;
+			this->_size--;
+			this->finalPos = (this->_size / 4) * 4;
+			if (this->dataToDelete == nullptr)
+			{
+				uint64_t* newData = new uint64_t[this->_size];
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = data1[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i] = data1[i + 1];
+				}
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+			else
+			{
+				for (size_t i = index; i < this->_size; i++)
+				{
+					data1[i] = data1[i + 1];
+				}
+			}
 		}
 
 		// Block
@@ -2090,17 +2604,47 @@ namespace alge
 		uint64_t* dataToDelete;
 		size_t _size;
 		size_t finalPos;
+		size_t _capacity;
 	};
 
 	template <>
 	class vector<double>
 	{
 	public:
-		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
+		inline vector() : 
+			_data(nullptr), 
+			dataToDelete(nullptr), 
+			_size(0), 
+			finalPos(0), 
+			_capacity(0) {}
 
-		inline vector(size_t size) : _data(new double[size]), dataToDelete(_data), _size(size), finalPos((size / 4) * 4) {}
+		inline vector(size_t size) : 
+			_data(new double[size]),
+			dataToDelete(_data), 
+			_size(size), 
+			finalPos((size / 4) * 4), 
+			_capacity(size) {}
 
-		inline vector(double* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 4) * 4) {}
+		inline vector(double* data, size_t size) : 
+			_data(data), 
+			dataToDelete(nullptr), 
+			_size(size), 
+			finalPos((size / 4) * 4), 
+			_capacity(size) {}
+
+		inline vector(std::initializer_list<double> list)
+		{
+			this->_size = list.size();
+			this->finalPos = (this->_size / 4) * 4;
+			this->_data = new double[this->_size];
+			this->dataToDelete = this->_data;
+			this->_capacity = this->_size;
+
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				this->_data[i] = *(list.begin() + i);
+			}
+		}
 
 		inline ~vector() { delete[] this->dataToDelete; }
 
@@ -2144,6 +2688,12 @@ namespace alge
 
 		friend inline vector<uint8_t> operator<=(double, vector<double>&);
 
+		template<typename T>
+		friend inline size_t upper_bound(vector<T>&, size_t, size_t, T);
+
+		template<typename T>
+		friend inline size_t lower_bound(vector<T>&, size_t, size_t, T);
+
 		friend std::ostream& operator<<(std::ostream&, const vector<double>&);
 
 		template<typename T>
@@ -2183,6 +2733,221 @@ namespace alge
 		inline double* data() { return this->_data; }
 
 		inline size_t size() { return this->_size; }
+
+		inline size_t capacity() { return this->_capacity; }
+
+		template<bool reduceCapacity = true>
+		inline void clear()
+		{
+			if constexpr (reduceCapacity)
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+				delete[] this->dataToDelete;
+				this->_data = nullptr;
+				this->dataToDelete = nullptr;
+			}
+			else
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+			}
+		}
+
+		inline void reserve(size_t newCapacity)
+		{
+			double* newData = new double[newCapacity];
+			double* oldData = this->_data;
+			
+			this->_size = this->_size <= newCapacity ? this->_size : newCapacity;
+			this->finalPos = (this->_size / 4) * 4;
+			this->_capacity = newCapacity;
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				newData[i] = oldData[i];
+			}
+			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			this->_data = newData;
+			this->dataToDelete = newData;
+		}
+
+		inline void append(double num)
+		{
+			if (this->_capacity > this->_size)
+			{
+				this->_data[this->_size] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity = this->_capacity + increase;
+				double* newData = new double[this->_capacity];
+				double* oldData = this->_data;
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				newData[this->_size] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 4) * 4;
+		}
+		
+		inline void append(std::initializer_list<double> list)
+		{
+			size_t newSize = this->_size + list.size();
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = *(list.begin() + j);
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t sizeList = list.size();
+				size_t increase = this->_capacity / 2;
+				increase = increase >= sizeList ? increase : sizeList;
+				
+				this->_capacity = this->_capacity + increase;
+				double* newData = new double[this->_capacity];
+				double* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = *(list.begin() + j);
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 4) * 4;
+		}
+
+		inline void append(vector<double>& other)
+		{
+			size_t newSize = this->_size + other._size;
+
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = other._data[j];
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase >= other._size ? increase : other._size;
+
+				this->_capacity = this->_capacity + increase;
+				double* newData = new double[this->_capacity];
+				double* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = other._data[j];
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 4) * 4;
+		}
+		
+		inline void insert(double num, size_t index)
+		{
+			if (this->_capacity > this->_size)
+			{
+				double* data1 = this->_data;
+
+				double tmp = num;
+				double tmp2;
+				for (size_t i = index; i < this->_size; i++)
+				{
+					tmp2 = data1[i];
+					data1[i] = tmp;
+					tmp = tmp2;
+				}
+				data1[index] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity += increase;
+				double* newData = new double[this->_capacity];
+				double* oldData = this->_data;
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i + 1] = oldData[i];
+				}
+				newData[index] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 4) * 4;
+		}
+
+		inline void erase(size_t index)
+		{
+			double* data1 = this->_data;
+			this->_size--;
+			this->finalPos = (this->_size / 4) * 4;
+			if (this->dataToDelete == nullptr)
+			{
+				double* newData = new double[this->_size];
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = data1[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i] = data1[i + 1];
+				}
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+			else
+			{
+				for (size_t i = index; i < this->_size; i++)
+				{
+					data1[i] = data1[i + 1];
+				}
+			}
+		}
 
 		// Block
 
@@ -4776,16 +5541,47 @@ namespace alge
 		double* dataToDelete;
 		size_t _size;
 		size_t finalPos;
+		size_t _capacity;
 	};
 
 	template <>
 	class vector<float>
 	{
 	public:
-		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
-		inline vector(size_t size) : _data(new float[size]), dataToDelete(_data), _size(size), finalPos((size / 8) * 8) {}
+		inline vector() : 
+			_data(nullptr), 
+			dataToDelete(nullptr), 
+			_size(0), 
+			finalPos(0), 
+			_capacity(0) {}
 
-		inline vector(float* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 8) * 8) {}
+		inline vector(size_t size) : 
+			_data(new float[size]), 
+			dataToDelete(_data), 
+			_size(size), 
+			finalPos((size / 8) * 8),
+			_capacity(size) {}
+
+		inline vector(float* data, size_t size) : 
+			_data(data),
+			dataToDelete(nullptr), 
+			_size(size), 
+			finalPos((size / 8) * 8), 
+			_capacity(size) {}
+
+		inline vector(std::initializer_list<float> list)
+		{
+			this->_size = list.size();
+			this->finalPos = (this->_size / 8) * 8;
+			this->_data = new float[this->_size];
+			this->dataToDelete = this->_data;
+			this->_capacity = this->_size;
+
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				this->_data[i] = *(list.begin() + i);
+			}
+		}
 
 		inline ~vector() { delete[] this->dataToDelete; }
 
@@ -4828,6 +5624,12 @@ namespace alge
 		friend inline vector<uint8_t> operator<=(float, vector<float>&);
 
 		template<typename T>
+		friend inline size_t upper_bound(vector<T>&, size_t, size_t, T);
+
+		template<typename T>
+		friend inline size_t lower_bound(vector<T>&, size_t, size_t, T);
+
+		template<typename T>
 		friend inline vector<T> concatenate(vector<T>&, vector<T>&);
 
 		inline float& operator[](size_t index)
@@ -4862,6 +5664,221 @@ namespace alge
 		}
 
 		inline float* data() { return this->_data; }
+
+		inline size_t capacity() { return this->_capacity; }
+
+		template<bool reduceCapacity = true>
+		inline void clear()
+		{
+			if constexpr (reduceCapacity)
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+				delete[] this->dataToDelete;
+				this->_data = nullptr;
+				this->dataToDelete = nullptr;
+			}
+			else
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+			}
+		}
+
+		inline void reserve(size_t newCapacity)
+		{
+			float* newData = new float[newCapacity];
+			float* oldData = this->_data;
+
+			this->_size = this->_size <= newCapacity ? this->_size : newCapacity;
+			this->finalPos = (this->_size / 8) * 8;
+			this->_capacity = newCapacity;
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				newData[i] = oldData[i];
+			}
+			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			this->_data = newData;
+			this->dataToDelete = newData;
+		}
+
+		inline void append(float num)
+		{
+			if (this->_capacity > this->_size)
+			{
+				this->_data[this->_size] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity = this->_capacity + increase;
+				float* newData = new float[this->_capacity];
+				float* oldData = this->_data;
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				newData[this->_size] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 8) * 8;
+		}
+
+		inline void append(std::initializer_list<float> list)
+		{
+			size_t newSize = this->_size + list.size();
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = *(list.begin() + j);
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t sizeList = list.size();
+				size_t increase = this->_capacity / 2;
+				increase = increase >= sizeList ? increase : sizeList;
+
+				this->_capacity = this->_capacity + increase;
+				float* newData = new float[this->_capacity];
+				float* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = *(list.begin() + j);
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 8) * 8;
+		}
+
+		inline void append(vector<float>& other)
+		{
+			size_t newSize = this->_size + other._size;
+
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = other._data[j];
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase >= other._size ? increase : other._size;
+
+				this->_capacity = this->_capacity + increase;
+				float* newData = new float[this->_capacity];
+				float* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = other._data[j];
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 8) * 8;
+		}
+
+		inline void insert(float num, size_t index)
+		{
+			if (this->_capacity > this->_size)
+			{
+				float* data1 = this->_data;
+
+				float tmp = num;
+				float tmp2;
+				for (size_t i = index; i < this->_size; i++)
+				{
+					tmp2 = data1[i];
+					data1[i] = tmp;
+					tmp = tmp2;
+				}
+				data1[index] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity += increase;
+				float* newData = new float[this->_capacity];
+				float* oldData = this->_data;
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i + 1] = oldData[i];
+				}
+				newData[index] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 8) * 8;
+		}
+
+		inline void erase(size_t index)
+		{
+			float* data1 = this->_data;
+			this->_size--;
+			this->finalPos = (this->_size / 8) * 8;
+			if (this->dataToDelete == nullptr)
+			{
+				float* newData = new float[this->_size];
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = data1[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i] = data1[i + 1];
+				}
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+			else
+			{
+				for (size_t i = index; i < this->_size; i++)
+				{
+					data1[i] = data1[i + 1];
+				}
+			}
+		}
 
 		// Block
 
@@ -7429,17 +8446,47 @@ namespace alge
 		float* dataToDelete;
 		size_t _size;
 		size_t finalPos;
+		size_t _capacity;
 	};
 
 	template <>
 	class vector<int>
 	{
 	public:
-		inline vector() : _data(nullptr), dataToDelete(nullptr), _size(0), finalPos(0) {}
+		inline vector() : 
+			_data(nullptr), 
+			dataToDelete(nullptr), 
+			_size(0), 
+			finalPos(0), 
+			_capacity(0) {}
 
-		inline vector(size_t size) : _data(new int[size]), dataToDelete(_data), _size(size), finalPos((size / 8) * 8) {}
+		inline vector(size_t size) : 
+			_data(new int[size]), 
+			dataToDelete(_data), 
+			_size(size), 
+			finalPos((size / 8) * 8), 
+			_capacity(size) {}
 
-		inline vector(int* data, size_t size) : _data(data), dataToDelete(nullptr), _size(size), finalPos((size / 8) * 8) {}
+		inline vector(int* data, size_t size) : 
+			_data(data), 
+			dataToDelete(nullptr), 
+			_size(size), 
+			finalPos((size / 8) * 8), 
+			_capacity(size) {}
+
+		inline vector(std::initializer_list<int> list)
+		{
+			this->_size = list.size();
+			this->finalPos = (this->_size / 4) * 4;
+			this->_data = new int[this->_size];
+			this->dataToDelete = this->_data;
+			this->_capacity = this->_size;
+
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				this->_data[i] = *(list.begin() + i);
+			}
+		}
 
 		inline ~vector() { delete[] this->dataToDelete; }
 
@@ -7486,6 +8533,12 @@ namespace alge
 
 		friend inline vector<uint8_t> operator<=(int, vector<int>&);
 
+		template<typename T>
+		friend inline size_t upper_bound(vector<T>&, size_t, size_t, T);
+
+		template<typename T>
+		friend inline size_t lower_bound(vector<T>&, size_t, size_t, T);
+
 		// -----
 
 		inline int* data() { return this->_data; }
@@ -7521,6 +8574,221 @@ namespace alge
 				dataResult[i] = data1[dataIndices[i]];
 			}
 			return result;
+		}
+
+		inline size_t capacity() { return this->_capacity; }
+
+		template<bool reduceCapacity = true>
+		inline void clear()
+		{
+			if constexpr (reduceCapacity)
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+				delete[] this->dataToDelete;
+				this->_data = nullptr;
+				this->dataToDelete = nullptr;
+			}
+			else
+			{
+				this->_size = 0;
+				this->_capacity = 0;
+				this->finalPos = 0;
+			}
+		}
+
+		inline void reserve(size_t newCapacity)
+		{
+			int* newData = new int[newCapacity];
+			int* oldData = this->_data;
+
+			this->_size = this->_size <= newCapacity ? this->_size : newCapacity;
+			this->finalPos = (this->_size / 8) * 8;
+			this->_capacity = newCapacity;
+			for (size_t i = 0; i < this->_size; i++)
+			{
+				newData[i] = oldData[i];
+			}
+			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			this->_data = newData;
+			this->dataToDelete = newData;
+		}
+
+		inline void append(int num)
+		{
+			if (this->_capacity > this->_size)
+			{
+				this->_data[this->_size] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity = this->_capacity + increase;
+				int* newData = new int[this->_capacity];
+				int* oldData = this->_data;
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				newData[this->_size] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 8) * 8;
+		}
+
+		inline void append(std::initializer_list<int> list)
+		{
+			size_t newSize = this->_size + list.size();
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = *(list.begin() + j);
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t sizeList = list.size();
+				size_t increase = this->_capacity / 2;
+				increase = increase >= sizeList ? increase : sizeList;
+
+				this->_capacity = this->_capacity + increase;
+				int* newData = new int[this->_capacity];
+				int* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = *(list.begin() + j);
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 8) * 8;
+		}
+
+		inline void append(vector<int>& other)
+		{
+			size_t newSize = this->_size + other._size;
+
+			if (this->_capacity >= newSize)
+			{
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					this->_data[i] = other._data[j];
+				}
+				this->_size = newSize;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase >= other._size ? increase : other._size;
+
+				this->_capacity = this->_capacity + increase;
+				int* newData = new int[this->_capacity];
+				int* oldData = this->_data;
+
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					newData[i] = oldData[i];
+				}
+
+				for (size_t i{ this->_size }, j{ 0 }; i < newSize; i++, j++)
+				{
+					newData[i] = other._data[j];
+				}
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size = newSize;
+			}
+			this->finalPos = (this->_size / 8) * 8;
+		}
+
+		inline void insert(int num, size_t index)
+		{
+			if (this->_capacity > this->_size)
+			{
+				int* data1 = this->_data;
+
+				int tmp = num;
+				int tmp2;
+				for (size_t i = index; i < this->_size; i++)
+				{
+					tmp2 = data1[i];
+					data1[i] = tmp;
+					tmp = tmp2;
+				}
+				data1[index] = num;
+				this->_size++;
+			}
+			else
+			{
+				size_t increase = this->_capacity / 2;
+				increase = increase > 0 ? increase : 1;
+				this->_capacity += increase;
+				int* newData = new int[this->_capacity];
+				int* oldData = this->_data;
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = oldData[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i + 1] = oldData[i];
+				}
+				newData[index] = num;
+
+				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+				this->_size++;
+			}
+			this->finalPos = (this->_size / 8) * 8;
+		}
+
+		inline void erase(size_t index)
+		{
+			int* data1 = this->_data;
+			this->_size--;
+			this->finalPos = (this->_size / 8) * 8;
+			if (this->dataToDelete == nullptr)
+			{
+				int* newData = new int[this->_size];
+
+				for (size_t i = 0; i < index; i++)
+				{
+					newData[i] = data1[i];
+				}
+				for (size_t i = index; i < this->_size; i++)
+				{
+					newData[i] = data1[i + 1];
+				}
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+			else
+			{
+				for (size_t i = index; i < this->_size; i++)
+				{
+					data1[i] = data1[i + 1];
+				}
+			}
 		}
 
 		// Block
@@ -8903,6 +10171,7 @@ namespace alge
 		int* dataToDelete;
 		size_t _size;
 		size_t finalPos;
+		size_t _capacity;
 	};
 
 	inline vector<uint8_t> vector<uint8_t>::operator[](vector<uint64_t>& indices)
@@ -49230,6 +50499,47 @@ namespace alge
 			}
 		}
 		return result;
+	}
+
+	template<typename T>
+	inline size_t upper_bound(vector<T>& vector1, size_t left, size_t right, T num)
+	{
+		T* data1 = vector1._data;
+		while (left <= right) 
+		{
+			size_t mid = left + (right - left) / 2;
+
+			if (data1[mid] <= num) 
+			{
+				left = mid + 1;
+			}
+			else 
+			{
+				right = mid - 1;
+			}
+		}
+		return left;
+	}
+
+	template<typename T>
+	inline size_t lower_bound(vector<T>& vector1, size_t left, size_t right, T num)
+	{
+		T* data1 = vector1._data;
+
+		while (left <= right) 
+		{
+			size_t mid = left + (right - left) / 2;
+
+			if (data1[mid] < num) 
+			{
+				left = mid + 1;
+			}
+			else 
+			{
+				right = mid - 1;
+			}
+		}
+		return left;
 	}
 
 	//---------------------------------------------------------------------------
