@@ -46,6 +46,7 @@
         static void f(void)
 #endif
 
+
 namespace alge
 {
 	template <typename T>
@@ -70,6 +71,45 @@ namespace alge
 			,
 			"The data type can only be double, float or uint8_t");
 	};
+
+	template<typename T>
+	size_t partition(size_t* indices, T* arr, size_t low, size_t high)
+	{
+		T pivot = arr[indices[low]];
+		size_t i = low - 1;
+		size_t j = high + 1;
+
+		while (true)
+		{
+			do
+			{
+				i++;
+			} while (arr[indices[i]] < pivot);
+
+			do
+			{
+				j--;
+			} while (arr[indices[j]] > pivot);
+
+			if (i >= j)
+			{
+				return j;
+			}
+
+			std::swap(indices[i], indices[j]);
+		}
+	}
+
+	template<typename T>
+	void quicksort(size_t* indices, T* arr, size_t low, size_t high)
+	{
+		if (low < high)
+		{
+			size_t pivotI = partition(indices, arr, low, high);
+			quicksort(indices, arr, low, pivotI);
+			quicksort(indices, arr, pivotI + 1, high);
+		}
+	}
 
 	//-----------------------------------
 
@@ -252,7 +292,7 @@ namespace alge
 			{
 				newData[i] = oldData[i];
 			}
-			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			delete[] this->dataToDelete;
 			this->_data = newData;
 			this->dataToDelete = newData;
 		}
@@ -277,7 +317,7 @@ namespace alge
 				}
 				newData[this->_size] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -316,7 +356,7 @@ namespace alge
 				{
 					newData[i] = *(list.begin() + j);
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -355,7 +395,7 @@ namespace alge
 				{
 					newData[i] = other._data[j];
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -399,7 +439,7 @@ namespace alge
 				}
 				newData[index] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -738,6 +778,17 @@ namespace alge
 			return sum;
 		}
 
+		// sort
+
+		inline void sort()
+		{
+			std::sort(this->_data, this->_data + this->_size);
+		}
+
+		// Argsort
+
+		inline vector<uint64_t> argsort();
+
 		// Cast
 
 		template<typename T>
@@ -964,7 +1015,7 @@ namespace alge
 			{
 				newData[i] = oldData[i];
 			}
-			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			delete[] this->dataToDelete;
 			this->_data = newData;
 			this->dataToDelete = newData;
 		}
@@ -989,7 +1040,7 @@ namespace alge
 				}
 				newData[this->_size] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -1027,7 +1078,7 @@ namespace alge
 				{
 					newData[i] = *(list.begin() + j);
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -1065,7 +1116,7 @@ namespace alge
 				{
 					newData[i] = other._data[j];
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -1108,7 +1159,7 @@ namespace alge
 				}
 				newData[index] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -1142,6 +1193,43 @@ namespace alge
 				{
 					data1[i] = data1[i + 1];
 				}
+			}
+		}
+
+		template<bool binarySearch = false>
+		inline size_t find(uint64_t num)
+		{
+			if constexpr (binarySearch)
+			{
+				size_t left = 0;
+				size_t right = this->_size - 1;
+
+				while (left <= right)
+				{
+					size_t mid = left + (right - left) / 2;
+
+					if (this->_data[mid] == num)
+					{
+						return mid;
+					}
+					else if (this->_data[mid] < num)
+					{
+						left = mid + 1;
+					}
+					else
+					{
+						right = mid - 1;
+					}
+				}
+				return this->_size;
+			}
+			else
+			{
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					if (this->_data[i] == num) return i;
+				}
+				return this->_size;
 			}
 		}
 
@@ -2525,6 +2613,21 @@ namespace alge
 			std::sort(this->_data, this->_data + this->_size);
 		}
 
+		// Argsort
+
+		inline vector<uint64_t> argsort()
+		{
+			vector<uint64_t> indices(this->_size);
+
+			size_t* indicesData = indices._data;
+
+			for (size_t i = 0; i < this->_size; i++) indicesData[i] = i;
+
+			quicksort(indicesData, this->_data, 0, this->_size - 1);
+
+			return indices;
+		}
+
 		// Cast
 
 		template<typename T>
@@ -2768,7 +2871,7 @@ namespace alge
 			{
 				newData[i] = oldData[i];
 			}
-			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			delete[] this->dataToDelete;
 			this->_data = newData;
 			this->dataToDelete = newData;
 		}
@@ -2793,7 +2896,7 @@ namespace alge
 				}
 				newData[this->_size] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -2831,7 +2934,7 @@ namespace alge
 				{
 					newData[i] = *(list.begin() + j);
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -2869,7 +2972,7 @@ namespace alge
 				{
 					newData[i] = other._data[j];
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -2912,7 +3015,7 @@ namespace alge
 				}
 				newData[index] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -2949,6 +3052,43 @@ namespace alge
 			}
 		}
 
+		template<bool binarySearch = false>
+		inline size_t find(double num)
+		{
+			if constexpr (binarySearch)
+			{
+				size_t left = 0;
+				size_t right = this->_size - 1;
+
+				while (left <= right)
+				{
+					size_t mid = left + (right - left) / 2;
+
+					if (this->_data[mid] == num)
+					{
+						return mid;
+					}
+					else if (this->_data[mid] < num)
+					{
+						left = mid + 1;
+					}
+					else
+					{
+						right = mid - 1;
+					}
+				}
+				return this->_size;
+			}
+			else
+			{
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					if (this->_data[i] == num) return i;
+				}
+				return this->_size;
+			}
+		}
+		
 		// Block
 
 		inline vector<double> block(size_t initial, size_t final)
@@ -5464,6 +5604,21 @@ namespace alge
 			std::sort(this->_data, this->_data + this->_size);
 		}
 
+		// Argsort
+
+		inline vector<uint64_t> argsort()
+		{
+			vector<uint64_t> indices(this->_size);
+
+			size_t* indicesData = indices._data;
+
+			for (size_t i = 0; i < this->_size; i++) indicesData[i] = i;
+
+			quicksort(indicesData, this->_data, 0, this->_size - 1);
+
+			return indices;
+		}
+
 		// Cast
 
 		template <typename T>
@@ -5699,7 +5854,7 @@ namespace alge
 			{
 				newData[i] = oldData[i];
 			}
-			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			delete[] this->dataToDelete;
 			this->_data = newData;
 			this->dataToDelete = newData;
 		}
@@ -5724,7 +5879,7 @@ namespace alge
 				}
 				newData[this->_size] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -5762,7 +5917,7 @@ namespace alge
 				{
 					newData[i] = *(list.begin() + j);
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -5800,7 +5955,7 @@ namespace alge
 				{
 					newData[i] = other._data[j];
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -5843,7 +5998,7 @@ namespace alge
 				}
 				newData[index] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -5877,6 +6032,43 @@ namespace alge
 				{
 					data1[i] = data1[i + 1];
 				}
+			}
+		}
+
+		template<bool binarySearch = false>
+		inline size_t find(float num)
+		{
+			if constexpr (binarySearch)
+			{
+				size_t left = 0;
+				size_t right = this->_size - 1;
+
+				while (left <= right)
+				{
+					size_t mid = left + (right - left) / 2;
+
+					if (this->_data[mid] == num)
+					{
+						return mid;
+					}
+					else if (this->_data[mid] < num)
+					{
+						left = mid + 1;
+					}
+					else
+					{
+						right = mid - 1;
+					}
+				}
+				return this->_size;
+			}
+			else
+			{
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					if (this->_data[i] == num) return i;
+				}
+				return this->_size;
 			}
 		}
 
@@ -8373,6 +8565,21 @@ namespace alge
 			std::sort(this->_data, this->_data + this->_size);
 		}
 
+		// Argsort
+
+		inline vector<uint64_t> argsort()
+		{
+			vector<uint64_t> indices(this->_size);
+
+			size_t* indicesData = indices._data;
+
+			for (size_t i = 0; i < this->_size; i++) indicesData[i] = i;
+
+			quicksort(indicesData, this->_data, 0, this->_size - 1);
+
+			return indices;
+		}
+
 		// Cast
 
 		template <typename T>
@@ -8610,7 +8817,7 @@ namespace alge
 			{
 				newData[i] = oldData[i];
 			}
-			if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+			delete[] this->dataToDelete;
 			this->_data = newData;
 			this->dataToDelete = newData;
 		}
@@ -8635,7 +8842,7 @@ namespace alge
 				}
 				newData[this->_size] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -8673,7 +8880,7 @@ namespace alge
 				{
 					newData[i] = *(list.begin() + j);
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -8711,7 +8918,7 @@ namespace alge
 				{
 					newData[i] = other._data[j];
 				}
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size = newSize;
@@ -8754,7 +8961,7 @@ namespace alge
 				}
 				newData[index] = num;
 
-				if (this->dataToDelete != nullptr) delete[] this->dataToDelete;
+				delete[] this->dataToDelete;
 				this->_data = newData;
 				this->dataToDelete = newData;
 				this->_size++;
@@ -8788,6 +8995,43 @@ namespace alge
 				{
 					data1[i] = data1[i + 1];
 				}
+			}
+		}
+
+		template<bool binarySearch = false>
+		inline size_t find(int num)
+		{
+			if constexpr (binarySearch)
+			{
+				size_t left = 0;
+				size_t right = this->_size - 1;
+
+				while (left <= right)
+				{
+					size_t mid = left + (right - left) / 2;
+
+					if (this->_data[mid] == num)
+					{
+						return mid;
+					}
+					else if (this->_data[mid] < num)
+					{
+						left = mid + 1;
+					}
+					else
+					{
+						right = mid - 1;
+					}
+				}
+				return this->_size;
+			}
+			else
+			{
+				for (size_t i = 0; i < this->_size; i++)
+				{
+					if (this->_data[i] == num) return i;
+				}
+				return this->_size;
 			}
 		}
 
@@ -10086,6 +10330,21 @@ namespace alge
 			std::sort(this->_data, this->_data + this->_size);
 		}
 
+		// Argsort
+
+		inline vector<uint64_t> argsort()
+		{
+			vector<uint64_t> indices(this->_size);
+
+			size_t* indicesData = indices._data;
+
+			for (size_t i = 0; i < this->_size; i++) indicesData[i] = i;
+
+			quicksort(indicesData, this->_data, 0, this->_size - 1);
+
+			return indices;
+		}
+
 		// Cast
 
 		template<typename T>
@@ -10193,6 +10452,19 @@ namespace alge
 		return result;
 	}
 
+	inline vector<uint64_t> vector<uint8_t>::argsort()
+	{
+		vector<uint64_t> indices(this->_size);
+
+		size_t* indicesData = indices._data;
+
+		for (size_t i = 0; i < this->_size; i++) indicesData[i] = i;
+
+		quicksort(indicesData, this->_data, 0, this->_size - 1);
+
+		return indices;
+	}
+
 	// Matrix
 
 	template <bool thisTransposed, bool thisContiguous>
@@ -10210,7 +10482,8 @@ namespace alge
 			actualCols(0),
 			finalPosRows(0),
 			finalPosCols(0),
-			finalPosSize(0) {}
+			finalPosSize(0), 
+			_capacityRows(0) {}
 
 		inline matrix(size_t rows, size_t cols) :
 			_data(new double[rows * cols]),
@@ -10222,7 +10495,8 @@ namespace alge
 			actualCols(cols),
 			finalPosRows((_rows / 4) * 4), 
 			finalPosCols((_cols / 4) * 4),
-			finalPosSize(((rows * cols) / 4) * 4) {}
+			finalPosSize(((rows * cols) / 4) * 4), 
+			_capacityRows(thisTransposed ? cols : rows) {}
 
 		inline matrix(double* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols) :
 			_data(data),
@@ -10234,7 +10508,46 @@ namespace alge
 			actualCols(actualCols),
 			finalPosRows((_rows / 4) * 4),
 			finalPosCols((_cols / 4) * 4),
-			finalPosSize((_size / 4) * 4) {}
+			finalPosSize((_size / 4) * 4), 
+			_capacityRows(thisTransposed ? cols : rows) {}
+
+		inline matrix(std::initializer_list<std::initializer_list<double>> list)
+		{
+			this->_rows = list.size();
+			this->_cols = (*list.begin()).size();
+			this->actualRows = this->_rows;
+			this->actualCols = this->_cols;
+			this->_size = this->_rows * this->_cols;
+			this->_data = new double[this->_size];
+			this->dataToDelete = this->_data;
+			this->finalPosRows = (this->_rows / 4) * 4;
+			this->finalPosCols = (this->_cols / 4) * 4;
+			this->finalPosSize = (this->_size / 4) * 4;
+			this->_capacityRows = thisTransposed ? this->_cols : this->_rows;
+
+			if constexpr (thisTransposed)
+			{
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					std::initializer_list<double> listI = *(list.begin() + i);
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						this->_data[j * this->actualRows + i] = *(listI.begin() + j);
+					}
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					std::initializer_list<double> listI = *(list.begin() + i);
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						this->_data[i * this->actualCols + j] = *(listI.begin() + j);
+					}
+				}
+			}
+		}
 
 		inline ~matrix() { delete[] this->dataToDelete; }
 
@@ -10423,6 +10736,608 @@ namespace alge
 			else
 			{
 				return this->_data[row * this->actualCols + col];
+			}
+		}
+
+		inline size_t capacity() { return this->_capacityRows; }
+
+		template<bool reduceCapacity = true>
+		inline void clear()
+		{
+			if constexpr (reduceCapacity)
+			{
+				this->_size = 0;
+				this->finalPosSize = 0;
+				this->finalPosRows = 0;
+				this->finalPosCols = 0;
+				this->_rows = 0;
+				this->_cols = 0;
+
+				this->_capacityRows = 0;
+				delete[] this->dataToDelete;
+				this->_data = nullptr;
+				this->dataToDelete = nullptr;
+			}
+			else
+			{
+				this->_size = 0;
+				this->finalPosSize = 0;
+				this->finalPosRows = 0;
+				this->finalPosCols = 0;
+				this->_rows = 0;
+				this->_cols = 0;
+			}
+
+		}
+
+		inline void reserve(size_t newCapacity)
+		{
+			if constexpr (thisTransposed)
+			{
+				double* newData = new double[newCapacity * this->_rows];
+				double* oldData = this->_data;
+
+				this->_cols = this->_cols <= newCapacity ? this->_cols : newCapacity;
+
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 4) * 4;
+				this->finalPoscols = (this->_cols / 4) * 4;
+
+				this->_capacityRows = newCapacity;
+
+				for (size_t i = 0; i < this->_cols; i++)
+				{
+					for (size_t j = 0; j < this->_rows; j++)
+					{
+						newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+					}
+				}
+
+				delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+			else
+			{
+				double* newData = new double[newCapacity * this->_cols];
+				double* oldData = this->_data;
+
+				this->_rows = this->_rows <= newCapacity ? this->_rows : newCapacity;
+
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 4) * 4;
+				this->finalPosRows = (this->_rows / 4) * 4;
+
+				this->_capacityRows = newCapacity;
+
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+					}
+				}
+
+				delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+		}
+
+		inline void append(std::initializer_list<std::initializer_list<double>> list)
+		{
+			size_t sizeList = list.size();
+
+			if constexpr (thisTransposed)
+			{
+				size_t newCols = this->_cols + sizeList;
+
+				if (this->_capacityRows >= newCols)
+				{
+					for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+					{
+						std::initializer_list<double> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							this->_data[i * this->actualRows + j] = *(listI.begin() + j);
+						}
+					}
+				}
+				else
+				{
+					size_t increase = this->_capacityRows / 2;
+					increase = increase >= sizeList ? increase : sizeList;
+					this->_capacityRows += increase;
+
+					double* newData = new double[this->_capacityRows * this->_rows];
+					double* oldData = this->_data;
+
+					for (size_t i = 0; i < this->_cols; i++)
+					{
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+						}
+					}
+					for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+					{
+						std::initializer_list<double> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							newData[i * this->_rows + j] = *(listI.begin() + j);
+						}
+					}
+
+					delete[] this->dataToDelete;
+
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+
+				this->_cols = newCols;
+				this->actualCols = newCols;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 4) * 4;
+				this->finalPosCols = (this->_cols / 4) * 4;
+			}
+			else
+			{
+				size_t newRows = this->_rows + sizeList;
+
+				if (this->_capacityRows >= newRows)
+				{
+					for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+					{
+						std::initializer_list<double> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = *(listI.begin() + j);
+						}
+					}
+				}
+				else
+				{
+					size_t increase = this->_capacityRows / 2;
+					increase = increase >= sizeList ? increase : sizeList;
+					this->_capacityRows += increase;
+
+					double* newData = new double[this->_capacityRows * this->_cols];
+					double* oldData = this->_data;
+
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+						}
+					}
+					for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+					{
+						std::initializer_list<double> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = *(listI.begin() + j);
+						}
+					}
+
+					delete[] this->dataToDelete;
+
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				this->_rows = newRows;
+				this->actualRows = newRows;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 4) * 4;
+				this->finalPosRows = (this->_rows / 4) * 4;
+			}
+		}
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline void append(matrix<double, otherTransposed, otherContiguous>& other)
+		{
+			size_t sizeOther = other._rows;
+
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._rows) throw std::invalid_argument("Error");
+#else
+#endif
+				size_t newCols = this->_cols + sizeOther;
+
+				if constexpr (otherTransposed)
+				{
+					if (this->_capacityRows >= newCols)
+					{
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								this->_data[i * this->actualRows + j] = other._data[i2 * other.actualRows + j];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						double* newData = new double[this->_capacityRows * this->_rows];
+						double* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_cols; i++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+							}
+						}
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = other._data[i2 * other.actualRows + j];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+				else
+				{
+					if (this->_capacityRows >= newCols)
+					{
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								this->_data[i * this->actualRows + j] = other._data[j * other.actualCols + i2];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						double* newData = new double[this->_capacityRows * this->_rows];
+						double* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_cols; i++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+							}
+						}
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = other._data[j * other.actualCols + i2];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+
+				this->_cols = newCols;
+				this->actualCols = newCols;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 4) * 4;
+				this->finalPosCols = (this->_cols / 4) * 4;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._cols) throw std::invalid_argument("Error");
+#else
+#endif
+				size_t newRows = this->_rows + sizeOther;
+				
+				if constexpr (otherTransposed)
+				{
+					if (this->_capacityRows >= newRows)
+					{
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								this->_data[i * this->actualCols + j] = other._data[j * other.actualRows + i2];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						double* newData = new double[this->_capacityRows * this->_cols];
+						double* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+							}
+						}
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = other._data[j * other.actualRows + i2];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+				else
+				{
+					if (this->_capacityRows >= newRows)
+					{
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								this->_data[i * this->actualCols + j] = other._data[i2 * other.actualCols + j];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+						
+						double* newData = new double[this->_capacityRows * this->_cols];
+						double* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+							}
+						}
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = other._data[i2 * other.actualCols + j];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+
+				this->_rows = newRows;
+				this->actualRows = newRows;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 4) * 4;
+				this->finalPosRows = (this->_rows / 4) * 4;
+			}
+		}
+
+		inline void erase(size_t index)
+		{
+			if constexpr (thisTransposed)
+			{
+				this->_cols--;
+				this->actualCols--;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosCols = (this->_cols / 4) * 4;
+				this->finalPosSize = (this->_size / 4) * 4;
+
+				if (this->dataToDelete == nullptr)
+				{
+					double* newData = new double[this->_rows * this->_cols];
+					double* oldData = this->_data;
+
+					for (size_t i = 0; i < index; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[j * this->actualRows + i];
+						}
+					}
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->actualCols + j] = oldData[j * this->actualRows + i2];
+						}
+					}
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				else
+				{
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = this->_data[j * this->actualRows + i2];
+						}
+					}
+
+				}
+			}
+			else
+			{
+				this->_rows--;
+				this->actualRows--;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosRows = (this->_rows / 4) * 4;
+				this->finalPosSize = (this->_size / 4) * 4;
+
+				if (this->dataToDelete == nullptr)
+				{
+					double* newData = new double[this->_rows * this->_cols];
+					double* oldData = this->_data;
+
+					for (size_t i = 0; i < index; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+						}
+					}
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->actualCols + j] = oldData[i2 * this->actualCols + j];
+						}
+					}
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				else
+				{
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = this->_data[i2 * this->actualCols + j];
+						}
+					}
+					
+				}
+			}
+		}
+
+		inline size_t find(vector<double>& other)
+		{
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._size) throw std::invalid_argument("Error");
+#else
+#endif
+				for (size_t j = 0; j < this->_cols; j++)
+				{
+					bool equal = true;
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						if (this->_data[j * this->actualRows + i] != other._data[i]) equal = false;
+					}
+					if (equal) return j;
+				}
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._size) throw std::invalid_argument("Error");
+#else
+#endif
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					bool equal = true;
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						if (this->_data[i * this->actualCols + j] != other._data[j]) equal = false;
+					}
+					if (equal) return i;
+				}
+			}
+		}
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline vector<uint64_t> find(matrix<double, otherTransposed, otherContiguous>& other)
+		{
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._rows) throw std::invalid_argument("Wrong dimension");
+#else
+#endif
+				vector<uint64_t> result(other._cols);
+
+				uint64_t* dataResult = result._data;
+
+				for (size_t col = 0; col < other._cols; col++)
+				{
+					size_t index = this->_cols;
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						bool equal = true;
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							if constexpr (otherTransposed)
+							{
+								if (this->_data[j * this->actualRows + i] != other._data[col * other.actualRows + i]) equal = false;
+							}
+							else
+							{
+								if (this->_data[j * this->actualRows + i] != other._data[i * other.actualCols + col]) equal = false;
+							}
+						}
+						if (equal)
+						{
+							index = j;
+							break;
+						}
+					}
+					dataResult[col] = index;
+				}
+				return result;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._cols) throw std::invalid_argument("Wrong dimension");
+#else
+#endif
+				vector<uint64_t> result(other._rows);
+
+				uint64_t* dataResult = result._data;
+
+				for (size_t row = 0; row < other._rows; row++)
+				{
+					size_t index = this->_rows;
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						bool equal = true;
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							if constexpr (otherTransposed)
+							{
+								if (this->_data[i * this->actualCols + j] != other._data[j * other.actualRows + row]) equal = false;
+							}
+							else
+							{
+								if (this->_data[i * this->actualCols + j] != other._data[row * other.actualCols + j]) equal = false;
+							}
+						}
+						if (equal)
+						{
+							index = i;
+							break;
+						}
+					}
+					dataResult[row] = index;
+				}
+				return result;
 			}
 		}
 
@@ -29965,6 +30880,7 @@ namespace alge
 		size_t _rows, _cols, _size;
 		size_t actualRows, actualCols;
 		size_t finalPosRows, finalPosCols, finalPosSize;
+		size_t _capacityRows;
 	};
 
 	template <bool thisTransposed, bool thisContiguous>
@@ -30015,6 +30931,44 @@ namespace alge
 			finalPosSize256((_size / 256) * 256),
 			finalPosRows256((rows / 256) * 256),
 			finalPosCols256((cols / 256) * 256) {}
+
+		inline matrix(std::initializer_list<std::initializer_list<double>> list)
+		{
+			this->_rows = list.size();
+			this->_cols = (*list.begin()).size();
+			this->actualRows = this->_rows;
+			this->actualCols = this->_cols;
+			this->_size = this->_rows * this->_cols;
+			this->_data = new uint8_t[this->_size];
+			this->dataToDelete = this->_data;
+			this->finalPosRows = (this->_rows / 4) * 4;
+			this->finalPosCols = (this->_cols / 4) * 4;
+			this->finalPosSize = (this->_size / 4) * 4;
+			this->_capacityRows = thisTransposed ? this->_cols : this->_rows;
+
+			if constexpr (thisTransposed)
+			{
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					std::initializer_list<uint8_t> listI = *(list.begin() + i);
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						this->_data[j * this->actualRows + i] = *(listI.begin() + j);
+					}
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					std::initializer_list<uint8_t> listI = *(list.begin() + i);
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						this->_data[i * this->actualCols + j] = *(listI.begin() + j);
+					}
+				}
+			}
+		}
 
 		inline ~matrix() { delete[] this->dataToDelete; }
 
@@ -30176,6 +31130,630 @@ namespace alge
 			else
 			{
 				return this->_data[row * this->actualCols + col];
+			}
+		}
+
+		inline size_t capacity() { return this->_capacityRows; }
+
+		template<bool reduceCapacity = true>
+		inline void clear()
+		{
+			if constexpr (reduceCapacity)
+			{
+				this->_size = 0;
+				this->finalPosSize = 0;
+				this->finalPosRows = 0;
+				this->finalPosCols = 0;
+				this->finalPosCols256 = 0;
+				this->finalPosRows256 = 0;
+				this->finalPosSize256 = 0;
+				this->_rows = 0;
+				this->_cols = 0;
+
+				this->_capacityRows = 0;
+				delete[] this->dataToDelete;
+				this->_data = nullptr;
+				this->dataToDelete = nullptr;
+			}
+			else
+			{
+				this->_size = 0;
+				this->finalPosSize = 0;
+				this->finalPosRows = 0;
+				this->finalPosCols = 0;
+				this->finalPosCols256 = 0;
+				this->finalPosRows256 = 0;
+				this->finalPosSize256 = 0;
+				this->_rows = 0;
+				this->_cols = 0;
+			}
+
+		}
+
+		inline void reserve(size_t newCapacity)
+		{
+			if constexpr (thisTransposed)
+			{
+				uint8_t* newData = new uint8_t[newCapacity * this->_rows];
+				uint8_t* oldData = this->_data;
+
+				this->_cols = this->_cols <= newCapacity ? this->_cols : newCapacity;
+
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 32) * 32;
+				this->finalPosSize256 = (this->_size / 256) * 256;
+				this->finalPoscols = (this->_cols / 32) * 32;
+				this->finalPosCols256 = (this->_cols / 256) * 256;
+
+				this->_capacityRows = newCapacity;
+
+				for (size_t i = 0; i < this->_cols; i++)
+				{
+					for (size_t j = 0; j < this->_rows; j++)
+					{
+						newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+					}
+				}
+
+				delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+			else
+			{
+				uint8_t* newData = new uint8_t[newCapacity * this->_cols];
+				uint8_t* oldData = this->_data;
+
+				this->_rows = this->_rows <= newCapacity ? this->_rows : newCapacity;
+
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 32) * 32;
+				this->finalPosSize256 = (this->_size / 256) * 256;
+				this->finalPosRows = (this->_rows / 32) * 32;
+				this->finalPosRows256 = (this->_rows / 256) * 256;
+
+				this->_capacityRows = newCapacity;
+
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+					}
+				}
+
+				delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+		}
+
+		inline void append(std::initializer_list<std::initializer_list<uint8_t>> list)
+		{
+			size_t sizeList = list.size();
+
+			if constexpr (thisTransposed)
+			{
+				size_t newCols = this->_cols + sizeList;
+
+				if (this->_capacityRows >= newCols)
+				{
+					for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+					{
+						std::initializer_list<uint8_t> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							this->_data[i * this->actualRows + j] = *(listI.begin() + j);
+						}
+					}
+				}
+				else
+				{
+					size_t increase = this->_capacityRows / 2;
+					increase = increase >= sizeList ? increase : sizeList;
+					this->_capacityRows += increase;
+
+					uint8_t* newData = new uint8_t[this->_capacityRows * this->_rows];
+					uint8_t* oldData = this->_data;
+
+					for (size_t i = 0; i < this->_cols; i++)
+					{
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+						}
+					}
+					for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+					{
+						std::initializer_list<uint8_t> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							newData[i * this->_rows + j] = *(listI.begin() + j);
+						}
+					}
+
+					delete[] this->dataToDelete;
+
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+
+				this->_cols = newCols;
+				this->actualCols = newCols;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 32) * 32;
+				this->finalPosCols = (this->_cols / 32) * 32;
+				this->finalPosSize256 = (this->_size / 256) * 256;
+				this->finalPosCols256 = (this->_cols / 256) * 256;
+			}
+			else
+			{
+				size_t newRows = this->_rows + sizeList;
+
+				if (this->_capacityRows >= newRows)
+				{
+					for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+					{
+						std::initializer_list<uint8_t> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = *(listI.begin() + j);
+						}
+					}
+				}
+				else
+				{
+					size_t increase = this->_capacityRows / 2;
+					increase = increase >= sizeList ? increase : sizeList;
+					this->_capacityRows += increase;
+
+					uint8_t* newData = new uint8_t[this->_capacityRows * this->_cols];
+					uint8_t* oldData = this->_data;
+
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+						}
+					}
+					for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+					{
+						std::initializer_list<uint8_t> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = *(listI.begin() + j);
+						}
+					}
+
+					delete[] this->dataToDelete;
+
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				this->_rows = newRows;
+				this->actualRows = newRows;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 32) * 32;
+				this->finalPosRows = (this->_rows / 32) * 32;
+				this->finalPosSize256 = (this->_size / 256) * 256;
+				this->finalPosRows256 = (this->_rows / 256) * 256;
+			}
+		}
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline void append(matrix<uint8_t, otherTransposed, otherContiguous>& other)
+		{
+			size_t sizeOther = other._rows;
+
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._rows) throw std::invalid_argument("Error");
+#else
+#endif
+				size_t newCols = this->_cols + sizeOther;
+
+				if constexpr (otherTransposed)
+				{
+					if (this->_capacityRows >= newCols)
+					{
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								this->_data[i * this->actualRows + j] = other._data[i2 * other.actualRows + j];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						uint8_t* newData = new uint8_t[this->_capacityRows * this->_rows];
+						uint8_t* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_cols; i++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+							}
+						}
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = other._data[i2 * other.actualRows + j];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+				else
+				{
+					if (this->_capacityRows >= newCols)
+					{
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								this->_data[i * this->actualRows + j] = other._data[j * other.actualCols + i2];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						uint8_t* newData = new uint8_t[this->_capacityRows * this->_rows];
+						uint8_t* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_cols; i++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+							}
+						}
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = other._data[j * other.actualCols + i2];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+
+				this->_cols = newCols;
+				this->actualCols = newCols;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 32) * 32;
+				this->finalPosCols = (this->_cols / 32) * 32;
+				this->finalPosSize256 = (this->_size / 256) * 256;
+				this->finalPosCols256 = (this->_cols / 256) * 256;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._cols) throw std::invalid_argument("Error");
+#else
+#endif
+				size_t newRows = this->_rows + sizeOther;
+
+				if constexpr (otherTransposed)
+				{
+					if (this->_capacityRows >= newRows)
+					{
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								this->_data[i * this->actualCols + j] = other._data[j * other.actualRows + i2];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						uint8_t* newData = new uint8_t[this->_capacityRows * this->_cols];
+						uint8_t* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+							}
+						}
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = other._data[j * other.actualRows + i2];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+				else
+				{
+					if (this->_capacityRows >= newRows)
+					{
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								this->_data[i * this->actualCols + j] = other._data[i2 * other.actualCols + j];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						uint8_t* newData = new uint8_t[this->_capacityRows * this->_cols];
+						uint8_t* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+							}
+						}
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = other._data[i2 * other.actualCols + j];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+
+				this->_rows = newRows;
+				this->actualRows = newRows;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 32) * 32;
+				this->finalPosRows = (this->_rows / 32) * 32;
+				this->finalPosSize256 = (this->_size / 256) * 256;
+				this->finalPosRows256 = (this->_rows / 256) * 256;
+			}
+		}
+
+		inline void erase(size_t index)
+		{
+			if constexpr (thisTransposed)
+			{
+				this->_cols--;
+				this->actualCols--;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosCols = (this->_cols / 32) * 32;
+				this->finalPosSize = (this->_size / 32) * 32;
+				this->finalPosCols256 = (this->_cols / 256) * 256;
+				this->finalPosSize256 = (this->_size / 256) * 256;
+
+				if (this->dataToDelete == nullptr)
+				{
+					uint8_t* newData = new uint8_t[this->_rows * this->_cols];
+					uint8_t* oldData = this->_data;
+
+					for (size_t i = 0; i < index; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[j * this->actualRows + i];
+						}
+					}
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->actualCols + j] = oldData[j * this->actualRows + i2];
+						}
+					}
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				else
+				{
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = this->_data[j * this->actualRows + i2];
+						}
+					}
+
+				}
+			}
+			else
+			{
+				this->_rows--;
+				this->actualRows--;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosRows = (this->_rows / 32) * 32;
+				this->finalPosSize = (this->_size / 32) * 32;
+				this->finalPosRows256 = (this->_rows / 256) * 256;
+				this->finalPosSize256 = (this->_size / 256) * 256;
+
+				if (this->dataToDelete == nullptr)
+				{
+					uint8_t* newData = new uint8_t[this->_rows * this->_cols];
+					uint8_t* oldData = this->_data;
+
+					for (size_t i = 0; i < index; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+						}
+					}
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->actualCols + j] = oldData[i2 * this->actualCols + j];
+						}
+					}
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				else
+				{
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = this->_data[i2 * this->actualCols + j];
+						}
+					}
+
+				}
+			}
+		}
+
+		inline size_t find(vector<uint8_t>& other)
+		{
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._size) throw std::invalid_argument("Error");
+#else
+#endif
+				for (size_t j = 0; j < this->_cols; j++)
+				{
+					bool equal = true;
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						if (this->_data[j * this->actualRows + i] != other._data[i]) equal = false;
+					}
+					if (equal) return j;
+				}
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._size) throw std::invalid_argument("Error");
+#else
+#endif
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					bool equal = true;
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						if (this->_data[i * this->actualCols + j] != other._data[j]) equal = false;
+					}
+					if (equal) return i;
+				}
+			}
+		}
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline vector<uint64_t> find(matrix<uint8_t, otherTransposed, otherContiguous>& other)
+		{
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._rows) throw std::invalid_argument("Wrong dimension");
+#else
+#endif
+				vector<uint64_t> result(other._cols);
+
+				uint64_t* dataResult = result._data;
+
+				for (size_t col = 0; col < other._cols; col++)
+				{
+					size_t index = this->_cols;
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						bool equal = true;
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							if constexpr (otherTransposed)
+							{
+								if (this->_data[j * this->actualRows + i] != other._data[col * other.actualRows + i]) equal = false;
+							}
+							else
+							{
+								if (this->_data[j * this->actualRows + i] != other._data[i * other.actualCols + col]) equal = false;
+							}
+						}
+						if (equal)
+						{
+							index = j;
+							break;
+						}
+					}
+					dataResult[col] = index;
+				}
+				return result;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._cols) throw std::invalid_argument("Wrong dimension");
+#else
+#endif
+				vector<uint64_t> result(other._rows);
+
+				uint64_t* dataResult = result._data;
+
+				for (size_t row = 0; row < other._rows; row++)
+				{
+					size_t index = this->_rows;
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						bool equal = true;
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							if constexpr (otherTransposed)
+							{
+								if (this->_data[i * this->actualCols + j] != other._data[j * other.actualRows + row]) equal = false;
+							}
+							else
+							{
+								if (this->_data[i * this->actualCols + j] != other._data[row * other.actualCols + j]) equal = false;
+							}
+						}
+						if (equal)
+						{
+							index = i;
+							break;
+						}
+					}
+					dataResult[row] = index;
+				}
+				return result;
 			}
 		}
 
@@ -31338,7 +32916,8 @@ namespace alge
 			actualCols(0),
 			finalPosRows(0),
 			finalPosCols(0),
-			finalPosSize(0) {}
+			finalPosSize(0), 
+			_capacityRows(0) {}
 
 		inline matrix(size_t rows, size_t cols) :
 			_data(new float[rows * cols]), 
@@ -31350,7 +32929,8 @@ namespace alge
 			actualCols(cols),
 			finalPosRows((_rows / 8) * 8),
 			finalPosCols((_cols / 8) * 8),
-			finalPosSize((_size / 8) * 8) {}
+			finalPosSize((_size / 8) * 8), 
+			_capacityRows(thisTransposed ? cols : rows) {}
 
 		inline matrix(float* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols) :
 			_data(data), 
@@ -31362,7 +32942,46 @@ namespace alge
 			actualCols(actualCols),
 			finalPosRows((_rows / 8) * 8),
 			finalPosCols((_cols / 8) * 8),
-			finalPosSize((_size / 8) * 8) {}
+			finalPosSize((_size / 8) * 8), 
+			_capacityRows(thisTransposed ? cols : rows) {}
+
+		inline matrix(std::initializer_list<std::initializer_list<float>> list)
+		{
+			this->_rows = list.size();
+			this->_cols = (*list.begin()).size();
+			this->actualRows = this->_rows;
+			this->actualCols = this->_cols;
+			this->_size = this->_rows * this->_cols;
+			this->_data = new float[this->_size];
+			this->dataToDelete = this->_data;
+			this->finalPosRows = (this->_rows / 4) * 4;
+			this->finalPosCols = (this->_cols / 4) * 4;
+			this->finalPosSize = (this->_size / 4) * 4;
+			this->_capacityRows = thisTransposed ? this->_cols : this->_rows;
+
+			if constexpr (thisTransposed)
+			{
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					std::initializer_list<float> listI = *(list.begin() + i);
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						this->_data[j * this->actualRows + i] = *(listI.begin() + j);
+					}
+				}
+			}
+			else
+			{
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					std::initializer_list<float> listI = *(list.begin() + i);
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						this->_data[i * this->actualCols + j] = *(listI.begin() + j);
+					}
+				}
+			}
+		}
 
 		inline ~matrix() { delete[] this->dataToDelete; }
 
@@ -31449,6 +33068,608 @@ namespace alge
 		inline size_t cols() { return this->_cols; }
 
 		inline float* data() { return this->_data; }
+
+		inline size_t capacity() { return this->_capacityRows; }
+
+		template<bool reduceCapacity = true>
+		inline void clear()
+		{
+			if constexpr (reduceCapacity)
+			{
+				this->_size = 0;
+				this->finalPosSize = 0;
+				this->finalPosRows = 0;
+				this->finalPosCols = 0;
+				this->_rows = 0;
+				this->_cols = 0;
+
+				this->_capacityRows = 0;
+				delete[] this->dataToDelete;
+				this->_data = nullptr;
+				this->dataToDelete = nullptr;
+			}
+			else
+			{
+				this->_size = 0;
+				this->finalPosSize = 0;
+				this->finalPosRows = 0;
+				this->finalPosCols = 0;
+				this->_rows = 0;
+				this->_cols = 0;
+			}
+
+		}
+
+		inline void reserve(size_t newCapacity)
+		{
+			if constexpr (thisTransposed)
+			{
+				float* newData = new float[newCapacity * this->_rows];
+				float* oldData = this->_data;
+
+				this->_cols = this->_cols <= newCapacity ? this->_cols : newCapacity;
+
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 8) * 8;
+				this->finalPoscols = (this->_cols / 8) * 8;
+
+				this->_capacityRows = newCapacity;
+
+				for (size_t i = 0; i < this->_cols; i++)
+				{
+					for (size_t j = 0; j < this->_rows; j++)
+					{
+						newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+					}
+				}
+
+				delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+			else
+			{
+				float* newData = new float[newCapacity * this->_cols];
+				float* oldData = this->_data;
+
+				this->_rows = this->_rows <= newCapacity ? this->_rows : newCapacity;
+
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 8) * 8;
+				this->finalPosRows = (this->_rows / 8) * 8;
+
+				this->_capacityRows = newCapacity;
+
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+					}
+				}
+
+				delete[] this->dataToDelete;
+				this->_data = newData;
+				this->dataToDelete = newData;
+			}
+		}
+
+		inline void append(std::initializer_list<std::initializer_list<float>> list)
+		{
+			size_t sizeList = list.size();
+
+			if constexpr (thisTransposed)
+			{
+				size_t newCols = this->_cols + sizeList;
+
+				if (this->_capacityRows >= newCols)
+				{
+					for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+					{
+						std::initializer_list<float> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							this->_data[i * this->actualRows + j] = *(listI.begin() + j);
+						}
+					}
+				}
+				else
+				{
+					size_t increase = this->_capacityRows / 2;
+					increase = increase >= sizeList ? increase : sizeList;
+					this->_capacityRows += increase;
+
+					float* newData = new float[this->_capacityRows * this->_rows];
+					float* oldData = this->_data;
+
+					for (size_t i = 0; i < this->_cols; i++)
+					{
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+						}
+					}
+					for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+					{
+						std::initializer_list<float> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_rows; j++)
+						{
+							newData[i * this->_rows + j] = *(listI.begin() + j);
+						}
+					}
+
+					delete[] this->dataToDelete;
+
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+
+				this->_cols = newCols;
+				this->actualCols = newCols;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 8) * 8;
+				this->finalPosCols = (this->_cols / 8) * 8;
+			}
+			else
+			{
+				size_t newRows = this->_rows + sizeList;
+
+				if (this->_capacityRows >= newRows)
+				{
+					for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+					{
+						std::initializer_list<float> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = *(listI.begin() + j);
+						}
+					}
+				}
+				else
+				{
+					size_t increase = this->_capacityRows / 2;
+					increase = increase >= sizeList ? increase : sizeList;
+					this->_capacityRows += increase;
+
+					float* newData = new float[this->_capacityRows * this->_cols];
+					float* oldData = this->_data;
+
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+						}
+					}
+					for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+					{
+						std::initializer_list<float> listI = *(list.begin() + i2);
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = *(listI.begin() + j);
+						}
+					}
+
+					delete[] this->dataToDelete;
+
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				this->_rows = newRows;
+				this->actualRows = newRows;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 8) * 8;
+				this->finalPosRows = (this->_rows / 8) * 8;
+			}
+		}
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline void append(matrix<float, otherTransposed, otherContiguous>& other)
+		{
+			size_t sizeOther = other._rows;
+
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._rows) throw std::invalid_argument("Error");
+#else
+#endif
+				size_t newCols = this->_cols + sizeOther;
+
+				if constexpr (otherTransposed)
+				{
+					if (this->_capacityRows >= newCols)
+					{
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								this->_data[i * this->actualRows + j] = other._data[i2 * other.actualRows + j];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						float* newData = new float[this->_capacityRows * this->_rows];
+						float* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_cols; i++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+							}
+						}
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = other._data[i2 * other.actualRows + j];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+				else
+				{
+					if (this->_capacityRows >= newCols)
+					{
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								this->_data[i * this->actualRows + j] = other._data[j * other.actualCols + i2];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						float* newData = new float[this->_capacityRows * this->_rows];
+						float* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_cols; i++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = oldData[i * this->actualRows + j];
+							}
+						}
+						for (size_t i{ this->_cols }, i2{ 0 }; i < newCols; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_rows; j++)
+							{
+								newData[i * this->_rows + j] = other._data[j * other.actualCols + i2];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+
+				this->_cols = newCols;
+				this->actualCols = newCols;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 8) * 8;
+				this->finalPosCols = (this->_cols / 8) * 8;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._cols) throw std::invalid_argument("Error");
+#else
+#endif
+				size_t newRows = this->_rows + sizeOther;
+
+				if constexpr (otherTransposed)
+				{
+					if (this->_capacityRows >= newRows)
+					{
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								this->_data[i * this->actualCols + j] = other._data[j * other.actualRows + i2];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						float* newData = new float[this->_capacityRows * this->_cols];
+						float* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+							}
+						}
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = other._data[j * other.actualRows + i2];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+				else
+				{
+					if (this->_capacityRows >= newRows)
+					{
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								this->_data[i * this->actualCols + j] = other._data[i2 * other.actualCols + j];
+							}
+						}
+					}
+					else
+					{
+						size_t increase = this->_capacityRows / 2;
+						increase = increase >= sizeOther ? increase : sizeOther;
+						this->_capacityRows += increase;
+
+						float* newData = new float[this->_capacityRows * this->_cols];
+						float* oldData = this->_data;
+
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+							}
+						}
+						for (size_t i{ this->_rows }, i2{ 0 }; i < newRows; i++, i2++)
+						{
+							for (size_t j = 0; j < this->_cols; j++)
+							{
+								newData[i * this->_cols + j] = other._data[i2 * other.actualCols + j];
+							}
+						}
+
+						delete[] this->dataToDelete;
+
+						this->_data = newData;
+						this->dataToDelete = newData;
+					}
+				}
+
+				this->_rows = newRows;
+				this->actualRows = newRows;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosSize = (this->_size / 8) * 8;
+				this->finalPosRows = (this->_rows / 8) * 8;
+			}
+		}
+
+		inline void erase(size_t index)
+		{
+			if constexpr (thisTransposed)
+			{
+				this->_cols--;
+				this->actualCols--;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosCols = (this->_cols / 8) * 8;
+				this->finalPosSize = (this->_size / 8) * 8;
+
+				if (this->dataToDelete == nullptr)
+				{
+					float* newData = new float[this->_rows * this->_cols];
+					float* oldData = this->_data;
+
+					for (size_t i = 0; i < index; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[j * this->actualRows + i];
+						}
+					}
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->actualCols + j] = oldData[j * this->actualRows + i2];
+						}
+					}
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				else
+				{
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = this->_data[j * this->actualRows + i2];
+						}
+					}
+
+				}
+			}
+			else
+			{
+				this->_rows--;
+				this->actualRows--;
+				this->_size = this->_rows * this->_cols;
+				this->finalPosRows = (this->_rows / 8) * 8;
+				this->finalPosSize = (this->_size / 8) * 8;
+
+				if (this->dataToDelete == nullptr)
+				{
+					float* newData = new float[this->_rows * this->_cols];
+					float* oldData = this->_data;
+
+					for (size_t i = 0; i < index; i++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->_cols + j] = oldData[i * this->actualCols + j];
+						}
+					}
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							newData[i * this->actualCols + j] = oldData[i2 * this->actualCols + j];
+						}
+					}
+					this->_data = newData;
+					this->dataToDelete = newData;
+				}
+				else
+				{
+					for (size_t i{ index }, i2{ index + 1 }; i < this->_rows; i++, i2++)
+					{
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							this->_data[i * this->actualCols + j] = this->_data[i2 * this->actualCols + j];
+						}
+					}
+
+				}
+			}
+		}
+
+		inline size_t find(vector<float>& other)
+		{
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._size) throw std::invalid_argument("Error");
+#else
+#endif
+				for (size_t j = 0; j < this->_cols; j++)
+				{
+					bool equal = true;
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						if (this->_data[j * this->actualRows + i] != other._data[i]) equal = false;
+					}
+					if (equal) return j;
+				}
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._size) throw std::invalid_argument("Error");
+#else
+#endif
+				for (size_t i = 0; i < this->_rows; i++)
+				{
+					bool equal = true;
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						if (this->_data[i * this->actualCols + j] != other._data[j]) equal = false;
+					}
+					if (equal) return i;
+				}
+			}
+		}
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline vector<uint64_t> find(matrix<float, otherTransposed, otherContiguous>& other)
+		{
+			if constexpr (thisTransposed)
+			{
+#ifdef _DEBUG
+				if (this->_rows != other._rows) throw std::invalid_argument("Wrong dimension");
+#else
+#endif
+				vector<uint64_t> result(other._cols);
+
+				uint64_t* dataResult = result._data;
+
+				for (size_t col = 0; col < other._cols; col++)
+				{
+					size_t index = this->_cols;
+					for (size_t j = 0; j < this->_cols; j++)
+					{
+						bool equal = true;
+						for (size_t i = 0; i < this->_rows; i++)
+						{
+							if constexpr (otherTransposed)
+							{
+								if (this->_data[j * this->actualRows + i] != other._data[col * other.actualRows + i]) equal = false;
+							}
+							else
+							{
+								if (this->_data[j * this->actualRows + i] != other._data[i * other.actualCols + col]) equal = false;
+							}
+						}
+						if (equal)
+						{
+							index = j;
+							break;
+						}
+					}
+					dataResult[col] = index;
+				}
+				return result;
+			}
+			else
+			{
+#ifdef _DEBUG
+				if (this->_cols != other._cols) throw std::invalid_argument("Wrong dimension");
+#else
+#endif
+				vector<uint64_t> result(other._rows);
+
+				uint64_t* dataResult = result._data;
+
+				for (size_t row = 0; row < other._rows; row++)
+				{
+					size_t index = this->_rows;
+					for (size_t i = 0; i < this->_rows; i++)
+					{
+						bool equal = true;
+						for (size_t j = 0; j < this->_cols; j++)
+						{
+							if constexpr (otherTransposed)
+							{
+								if (this->_data[i * this->actualCols + j] != other._data[j * other.actualRows + row]) equal = false;
+							}
+							else
+							{
+								if (this->_data[i * this->actualCols + j] != other._data[row * other.actualCols + j]) equal = false;
+							}
+						}
+						if (equal)
+						{
+							index = i;
+							break;
+						}
+					}
+					dataResult[row] = index;
+				}
+				return result;
+			}
+		}
 
 		inline matrix<float, thisTransposed, thisContiguous> row(size_t row)
 		{
@@ -46030,6 +48251,7 @@ namespace alge
 		size_t _rows, _cols, _size;
 		size_t actualRows, actualCols;
 		size_t finalPosRows, finalPosCols, finalPosSize;
+		size_t _capacityRows;
 	};
 
 	// Where
