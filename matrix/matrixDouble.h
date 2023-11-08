@@ -91,10 +91,13 @@ namespace alge
 		friend inline matrix<double> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, double, matrix<double, matrx2Transposed, matrix2Contiguous>&);
 
 		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
-		friend inline matrix<double> clip(matrix<double, thisTransposed, thisContiguous>&, double, double);
+		friend inline matrix<double> clip(matrix<double, thisTransposed, thisContiguous>&, vector<double>&, double, double);
 
 		template<bool useSteps, bool thisContiguous>
-		friend inline matrix<double> randomGenerator(alge::matrix<double, false, thisContiguous>&, size_t);
+		friend inline matrix<double> randomGenerator(matrix<double, false, thisContiguous>&, vector<double>&, size_t);
+
+		template<bool matrix1Contiguous, bool matrix2Contiguous>
+		friend inline vector<double> kernelDensity(matrix<double, false, matrix1Contiguous>&, matrix<double, false, matrix2Contiguous>&, double bandwidth = 1.0);
 
 		//----------------
 
@@ -104,9 +107,9 @@ namespace alge
 
 		inline double* data();
 
-		inline matrix<double, thisTransposed, thisContiguous> row(size_t);
+		inline matrix<double, thisTransposed, thisContiguous && !thisTransposed> row(size_t);
 
-		inline matrix<double, thisTransposed, thisContiguous> col(size_t);
+		inline matrix<double, thisTransposed, thisContiguous && thisTransposed> col(size_t);
 
 		inline matrix<double, !thisTransposed, thisContiguous> tranpose();
 
@@ -135,6 +138,16 @@ namespace alge
 
 		template<bool otherTransposed, bool otherContiguous>
 		inline vector<uint64_t> find(matrix<double, otherTransposed, otherContiguous>&);
+
+		inline void insert(std::initializer_list<double>, size_t);
+
+		inline void insert(vector<double>&, size_t);
+
+		template<bool otherTransposed, bool otherContiguous>
+		inline void insert(matrix<double, otherTransposed, otherContiguous>&, size_t);
+
+		template<bool otherContiguous>
+		inline vector<uint8_t> in(matrix<double, false, otherContiguous>& other);
 
 		// Copy
 
@@ -183,6 +196,11 @@ namespace alge
 
 		inline void operator+=(double);
 
+		template<bool returnTransposed = false>
+		inline matrix<double> operator+(const vector<double>&);
+
+		inline void operator+=(const vector<double>&);
+
 		// -
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
@@ -195,6 +213,11 @@ namespace alge
 		inline matrix<double> operator-(double);
 
 		inline void operator-=(double);
+
+		template<bool returnTransposed = false>
+		inline matrix<double> operator-(const vector<double>&);
+
+		inline void operator-=(const vector<double>&);
 
 		// *
 
@@ -209,6 +232,11 @@ namespace alge
 
 		inline void operator*=(double);
 
+		template<bool returnTransposed = false>
+		inline matrix<double> operator*(const vector<double>&);
+
+		inline void operator*=(const vector<double>&);
+
 		// /
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
@@ -221,6 +249,11 @@ namespace alge
 		inline matrix<double> operator/(double);
 
 		inline void operator/=(double);
+
+		template<bool returnTransposed = false>
+		inline matrix<double> operator/(const vector<double>&);
+
+		inline void operator/=(const vector<double>&);
 
 		// ==
 
@@ -463,4 +496,3 @@ namespace alge
 		size_t _capacityRows;
 	};
 }
-
