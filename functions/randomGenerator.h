@@ -11,10 +11,10 @@
 namespace alge
 {
 	template<bool useSteps = true, bool thisContiguous>
-	inline matrix<double> randomGenerator(alge::matrix<double, false, thisContiguous>& bounds, size_t nRandoms)
+	inline matrix<double> randomGenerator(alge::matrix<double, false, thisContiguous>& bounds, alge::vector<double>& steps, size_t nRandoms)
 	{
 #ifdef _DEBUG
-		if ((useSteps && bounds._cols < 3) || bounds._cols < 2) throw std::invalid_argument("Wrong dimensions");
+		if (bounds._cols < 2 || steps._size != bounds._rows) throw std::invalid_argument("Wrong dimensions");
 #else
 #endif
 
@@ -24,11 +24,11 @@ namespace alge
 		size_t boundsActualCols = bounds.actualCols;
 
 		double* data1 = bounds._data;
-
+		double* data2 = steps._data;
 		double* dataResult = result._data;
 
-		size_t finalPosCols = bounds.finalPosRows;
-		size_t finalPosRows = (nRandoms / 4) * 4;
+		size_t finalPosCols = result.finalPosCols;
+		size_t finalPosRows = result.finalPosRows;
 
 		masks_uint64_to_double;
 
@@ -46,10 +46,7 @@ namespace alge
 					data1[(j + 1) * boundsActualCols + 1],
 					data1[(j + 2) * boundsActualCols + 1],
 					data1[(j + 3) * boundsActualCols + 1]);
-				__m256d _step = _mm256_setr_pd(data1[j * boundsActualCols + 2],
-					data1[(j + 1) * boundsActualCols + 2],
-					data1[(j + 2) * boundsActualCols + 2],
-					data1[(j + 3) * boundsActualCols + 2]);
+				__m256d _step = _mm256_load_pd(&data2[j]);
 				__m256d _range = _mm256_sub_pd(_max, _min);
 				__m256d divisor = _mm256_set1_pd(18446744073709551615.0);
 				divisor = _mm256_div_pd(divisor, _range);
@@ -79,7 +76,7 @@ namespace alge
 				double min = data1[j * boundsActualCols];
 				double max = data1[j * boundsActualCols + 1];
 				double range = max - min;
-				double step = data1[j * boundsActualCols + 2];
+				double step = data2[j];
 				__m256d _min = _mm256_set1_pd(min);
 				__m256d _range = _mm256_set1_pd(range);
 				__m256d _step = _mm256_set1_pd(step);
@@ -234,10 +231,10 @@ namespace alge
 	}
 
 	template<bool useSteps = true, bool thisContiguous>
-	inline matrix<float> randomGenerator(alge::matrix<float, false, thisContiguous>& bounds, size_t nRandoms)
+	inline matrix<float> randomGenerator(alge::matrix<float, false, thisContiguous>& bounds, alge::vector<double>& steps, size_t nRandoms)
 	{
 #ifdef _DEBUG
-		if ((useSteps && bounds._cols < 3) || bounds._cols < 2) throw std::invalid_argument("Wrong dimensions");
+		if (bounds._cols < 2 || steps._size != bounds._rows) throw std::invalid_argument("Wrong dimensions");
 #else
 #endif
 
@@ -247,11 +244,11 @@ namespace alge
 		size_t boundsActualCols = bounds.actualCols;
 
 		float* data1 = bounds._data;
+		float* data2 = steps._data;
 
 		float* dataResult = result._data;
 
-		size_t finalPosCols = bounds.finalPosRows;
-		size_t finalPosRows = (nRandoms / 8) * 8;
+		size_t finalPosCols = result.finalPosCols;
 
 		__m256i random;
 
@@ -275,14 +272,7 @@ namespace alge
 					data1[(j + 5) * boundsActualCols + 1],
 					data1[(j + 6) * boundsActualCols + 1],
 					data1[(j + 7) * boundsActualCols + 1]);
-				__m256 _step = _mm256_setr_ps(data1[j * boundsActualCols + 2],
-					data1[(j + 1) * boundsActualCols + 2],
-					data1[(j + 2) * boundsActualCols + 2],
-					data1[(j + 3) * boundsActualCols + 2],
-					data1[(j + 4) * boundsActualCols + 2],
-					data1[(j + 5) * boundsActualCols + 2],
-					data1[(j + 6) * boundsActualCols + 2],
-					data1[(j + 7) * boundsActualCols + 2]);
+				__m256 _step = _mm256_load_ps(&data2[j]);
 				__m256 _range = _mm256_sub_ps(_max, _min);
 				__m256 divisor = _mm256_set1_ps(4294967295.0f);
 				divisor = _mm256_div_ps(divisor, _range);
@@ -312,7 +302,7 @@ namespace alge
 				float min = data1[j * boundsActualCols];
 				float max = data1[j * boundsActualCols + 1];
 				float range = max - min;
-				float step = data1[j * boundsActualCols + 2];
+				float step = data2[j];
 				__m256 _min = _mm256_set1_ps(min);
 				__m256 _range = _mm256_set1_ps(range);
 				__m256 _step = _mm256_set1_ps(step);
