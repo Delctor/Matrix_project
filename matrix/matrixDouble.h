@@ -46,10 +46,10 @@ namespace alge
 		friend inline matrix<T> concatenate_colwise(matrix<T, matrix1Transposed, matrix1Contiguous>&, matrix<T, matrix2Transposed, matrix2Contiguous>&);
 
 		template<typename T, bool returnTransposed>
-		friend inline matrix<T> concatenate_rowwise(void**, bool*, size_t, size_t, size_t);
+		friend inline matrix<T> concatenate_rowwise(void**, size_t, size_t, size_t);
 
 		template<typename T, bool returnTransposed>
-		friend inline matrix<T> concatenate_colwise(void**, bool*, size_t, size_t, size_t);
+		friend inline matrix<T> concatenate_colwise(void**, size_t, size_t, size_t);
 
 		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
 		friend inline matrix<double> operator+(double, matrix<double, thisTransposed, thisContiguous>&);
@@ -407,6 +407,9 @@ namespace alge
 
 		inline double mean_all();
 
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', double, vector<double>> mean();
+
 		// Sum
 
 		inline vector<double> sum_rowwise();
@@ -414,6 +417,9 @@ namespace alge
 		inline vector<double> sum_colwise();
 
 		inline double sum_all();
+
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', double, vector<double>> sum();
 
 		// Std
 
@@ -423,6 +429,9 @@ namespace alge
 
 		inline double std_all(double ddof = 0.0, double* mean = nullptr);
 
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', double, vector<double>> std(double ddof = 0.0, double* mean = nullptr);
+
 		// Min
 
 		inline vector<double> min_rowwise();
@@ -431,11 +440,17 @@ namespace alge
 
 		inline double min_all();
 
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', double, vector<double>> min();
+
 		inline void argmin_all(size_t*, size_t*);
 
 		inline vector<uint64_t> argmin_rowwise();
 
 		inline vector<uint64_t> argmin_colwise();
+
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', double, vector<double>> argmin(size_t* row = nullptr, size_t* col = nullptr);
 
 		// Max
 
@@ -445,11 +460,17 @@ namespace alge
 
 		inline double max_all();
 
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', double, vector<double>> max();
+
 		inline void argmax_all(size_t*, size_t*);
 
 		inline vector<uint64_t> argmax_rowwise();
 
 		inline vector<uint64_t> argmax_colwise();
+
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', double, vector<double>> argmax(size_t* row = nullptr, size_t* col = nullptr);
 
 		// Activation functions
 
