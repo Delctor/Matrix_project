@@ -1,7 +1,14 @@
 #pragma once
 #include <initializer.h>
-#include <matrixDouble.h>
 #include <matrixUint8_t.h>
+#include <matrixDouble.h>
+
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
 
 namespace alge
 {
@@ -12,11 +19,11 @@ namespace alge
 
 		inline matrix();
 
-		inline matrix(size_t rows, size_t cols);
+		inline matrix(size_t, size_t);
 
-		inline matrix(float* data, size_t rows, size_t cols, size_t actualRows, size_t actualCols);
+		inline matrix(float*, size_t, size_t, size_t, size_t);
 
-		inline matrix(std::initializer_list<std::initializer_list<float>> list);
+		inline matrix(std::initializer_list<std::initializer_list<float>>);
 
 		inline ~matrix();
 
@@ -44,6 +51,12 @@ namespace alge
 		template<bool returnTransposed, typename T, bool matrix1Transposed, bool matrix1Contiguous,
 			bool matrix2Transposed, bool matrix2Contiguous>
 		friend inline matrix<T> concatenate_colwise(matrix<T, matrix1Transposed, matrix1Contiguous>&, matrix<T, matrix2Transposed, matrix2Contiguous>&);
+
+		template<typename T, bool returnTransposed>
+		friend inline matrix<T> concatenate_rowwise(void**, size_t, size_t, size_t);
+
+		template<typename T, bool returnTransposed>
+		friend inline matrix<T> concatenate_colwise(void**, size_t, size_t, size_t);
 
 		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
 		friend inline matrix<float> operator+(float, matrix<float, thisTransposed, thisContiguous>&);
@@ -75,8 +88,8 @@ namespace alge
 		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
 		friend inline matrix<uint8_t> operator<=(float, matrix<float, thisTransposed, thisContiguous>&);
 
-		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
-		friend inline matrix<float> clip(matrix<float, thisTransposed, thisContiguous>&, float, float);
+		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous>
+		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, float, float);
 
 		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous
 			, bool matrx2Transposed, bool matrix2Contiguous, bool matrx3Transposed, bool matrix3Contiguous>
@@ -90,11 +103,14 @@ namespace alge
 			, bool matrx2Transposed, bool matrix2Contiguous>
 		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, float, matrix<float, matrx2Transposed, matrix2Contiguous>&);
 
-		template<bool returnTransposed, bool matrx1Transposed, bool matrix1Contiguous>
-		friend inline matrix<float> where(matrix<uint8_t, matrx1Transposed, matrix1Contiguous>&, float, float);
+		template<bool returnTransposed, bool thisTransposed, bool thisContiguous>
+		friend inline matrix<float> clip(matrix<float, thisTransposed, thisContiguous>&, vector<float>&, float, float);
 
 		template<bool useSteps, bool thisContiguous>
-		friend inline matrix<float> randomGenerator(alge::matrix<float, false, thisContiguous>&, size_t);
+		friend inline matrix<float> randomGenerator(matrix<float, false, thisContiguous>&, vector<float>&, size_t);
+
+		template<bool matrix1Contiguous, bool matrix2Contiguous>
+		friend inline vector<float> kernelDensity(matrix<float, false, matrix1Contiguous>&, matrix<float, false, matrix2Contiguous>&, float bandwidth);
 
 		//----------------
 
@@ -104,41 +120,47 @@ namespace alge
 
 		inline float* data();
 
+		inline matrix<float, thisTransposed, thisContiguous && !thisTransposed> row(size_t);
+
+		inline matrix<float, thisTransposed, thisContiguous&& thisTransposed> col(size_t);
+
+		inline matrix<float, !thisTransposed, thisContiguous> tranpose();
+
+		template<bool blockContiguous = false>
+		inline matrix<float, thisTransposed, thisContiguous&& blockContiguous> block(size_t, size_t, size_t, size_t);
+
+		inline float& operator()(size_t, size_t);
+
+		inline const float& operator()(size_t, size_t) const;
+
 		inline size_t capacity();
 
 		template<bool reduceCapacity = true>
 		inline void clear();
 
-		inline void reserve(size_t newCapacity);
+		inline void reserve(size_t);
 
-		inline void append(std::initializer_list<std::initializer_list<float>> list);
-
-		template<bool otherTransposed, bool otherContiguous>
-		inline void append(matrix<float, otherTransposed, otherContiguous>& other);
-
-		inline void erase(size_t index);
-
-		inline size_t find(vector<float>& other);
+		inline void append(std::initializer_list<std::initializer_list<float>>);
 
 		template<bool otherTransposed, bool otherContiguous>
-		inline vector<uint64_t> find(matrix<float, otherTransposed, otherContiguous>& other);
+		inline void append(matrix<float, otherTransposed, otherContiguous>&);
 
-		inline matrix<float, thisTransposed, thisContiguous> row(size_t row);
+		inline void erase(size_t);
 
-		inline matrix<float, thisTransposed, thisContiguous> col(size_t col);
+		inline size_t find(vector<float>&);
 
-		inline matrix<float, !thisTransposed, thisContiguous> tranpose();
+		template<bool otherTransposed, bool otherContiguous>
+		inline vector<uint64_t> find(matrix<float, otherTransposed, otherContiguous>&);
 
-		template<bool blockContiguous = false>
-		inline matrix<float, thisTransposed, thisContiguous&& blockContiguous> block(size_t initial_row, size_t initial_col, size_t final_row, size_t final_col);
+		inline void insert(std::initializer_list<float>, size_t);
 
-		inline float& operator()(size_t row, size_t col);
+		inline void insert(vector<float>&, size_t);
 
-		inline const float& operator()(size_t row, size_t col) const;
+		template<bool otherTransposed, bool otherContiguous>
+		inline void insert(matrix<float, otherTransposed, otherContiguous>&, size_t);
 
-		// Indentity
-
-		void identity();
+		template<bool otherContiguous>
+		inline vector<uint8_t> in(matrix<float, false, otherContiguous>& other);
 
 		// Copy
 
@@ -148,127 +170,151 @@ namespace alge
 		// =
 
 		template<bool otherTransposed, bool otherContiguous>
-		inline matrix<float, thisTransposed, thisContiguous>& operator=(matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<float, thisTransposed, thisContiguous>& operator=(matrix<float, otherTransposed, otherContiguous>&);
 
 		// Transfer
 
 		template<bool otherContiguous>
-		inline void transfer(matrix<float, thisTransposed, otherContiguous>& other);
+		inline void transfer(matrix<float, thisTransposed, otherContiguous>&);
 
 		// neg
 
 		template<bool returnTransposed = false>
 		inline matrix<float> operator-();
 
-		inline void self_not();
+		inline void self_neg();
 
 		// Set constant
 
-		inline void set_const(float num);
+		inline void set_const(float);
 
 		// Rand
 
 		inline void rand();
 
+		// Identity
+
+		inline void identity();
+
 		// +
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<float> operator+(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<float> operator+(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool otherTransposed, bool otherContiguous>
-		inline void operator+=(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline void operator+=(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<float> operator+(float num);
+		inline matrix<float> operator+(float);
 
-		inline void operator+=(float num);
+		inline void operator+=(float);
+
+		template<bool returnTransposed = false>
+		inline matrix<float> operator+(const vector<float>&);
+
+		inline void operator+=(const vector<float>&);
 
 		// -
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<float> operator-(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<float> operator-(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool otherTransposed, bool otherContiguous>
-		inline void operator-=(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline void operator-=(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<float> operator-(float num);
+		inline matrix<float> operator-(float);
 
-		inline void operator-=(float num);
+		inline void operator-=(float);
+
+		template<bool returnTransposed = false>
+		inline matrix<float> operator-(const vector<float>&);
+
+		inline void operator-=(const vector<float>&);
 
 		// *
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<float> operator*(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<float> operator*(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool otherTransposed, bool otherContiguous>
-		inline void operator*=(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline void operator*=(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<float> operator*(float num);
+		inline matrix<float> operator*(float);
 
-		inline void operator*=(float num);
+		inline void operator*=(float);
+
+		template<bool returnTransposed = false>
+		inline matrix<float> operator*(const vector<float>&);
+
+		inline void operator*=(const vector<float>&);
 
 		// /
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<float> operator/(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<float> operator/(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool otherTransposed, bool otherContiguous>
-		inline void operator/=(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline void operator/=(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<float> operator/(float num);
+		inline matrix<float> operator/(float);
 
-		inline void operator/=(float num);
+		inline void operator/=(float);
+
+		template<bool returnTransposed = false>
+		inline matrix<float> operator/(const vector<float>&);
+
+		inline void operator/=(const vector<float>&);
 
 		// ==
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<uint8_t> operator==(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<uint8_t> operator==(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t> operator==(float num);
+		inline matrix<uint8_t> operator==(float);
 
 		// !=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<uint8_t> operator!=(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<uint8_t> operator!=(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t> operator!=(float num);
+		inline matrix<uint8_t> operator!=(float);
 
 		// >
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<uint8_t> operator>(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<uint8_t> operator>(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t> operator>(float num);
+		inline matrix<uint8_t> operator>(float);
 
 		// <
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<uint8_t> operator<(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<uint8_t> operator<(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t> operator<(float num);
+		inline matrix<uint8_t> operator<(float);
 
 		// >=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<uint8_t> operator>=(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<uint8_t> operator>=(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t> operator>=(float num);
+		inline matrix<uint8_t> operator>=(float);
 
 		// <=
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<uint8_t> operator<=(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<uint8_t> operator<=(const matrix<float, otherTransposed, otherContiguous>&);
 
 		template<bool returnTransposed = false>
-		inline matrix<uint8_t> operator<=(float num);
+		inline matrix<uint8_t> operator<=(float);
 
 		// Functions
 
@@ -329,31 +375,36 @@ namespace alge
 
 		inline void self_floor();
 
+		template<bool returnTransposed = false>
+		inline matrix<float> ceil();
+
+		inline void self_ceil();
+
 		// pow
 
 		template<bool returnTransposed = false>
-		inline matrix<float> pow(float num);
+		inline matrix<float> pow(float);
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<float> pow(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<float> pow(const matrix<float, otherTransposed, otherContiguous>&);
 
-		inline void self_pow(float num);
+		inline void self_pow(float);
 
 		template<bool otherTransposed, bool otherContiguous>
-		inline void self_pow(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline void self_pow(const matrix<float, otherTransposed, otherContiguous>&);
 
 		// root
 
 		template<bool returnTransposed = false>
-		inline matrix<float> root(float num);
+		inline matrix<float> root(float);
 
 		template<bool returnTransposed = false, bool otherTransposed, bool otherContiguous>
-		inline matrix<float> root(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline matrix<float> root(const matrix<float, otherTransposed, otherContiguous>&);
 
-		inline void self_root(float num);
+		inline void self_root(float);
 
 		template<bool otherTransposed, bool otherContiguous>
-		inline void self_root(const matrix<float, otherTransposed, otherContiguous>& other);
+		inline void self_root(const matrix<float, otherTransposed, otherContiguous>&);
 
 		// Mean 
 
@@ -363,6 +414,9 @@ namespace alge
 
 		inline float mean_all();
 
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', float, vector<float>>::type mean();
+
 		// Sum
 
 		inline vector<float> sum_rowwise();
@@ -371,13 +425,19 @@ namespace alge
 
 		inline float sum_all();
 
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', float, vector<float>>::type sum();
+
 		// Std
 
-		inline vector<float> std_rowwise(float ddof = 0.0f);
+		inline vector<float> std_rowwise(float ddof = 0.0);
 
-		inline vector<float> std_colwise(float ddof = 0.0f);
+		inline vector<float> std_colwise(float ddof = 0.0);
 
-		inline float std_all(float ddof = 0.0f, float* mean = nullptr);
+		inline float std_all(float ddof = 0.0, float* mean = nullptr);
+
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', float, vector<float>>::type std(float ddof = 0.0, float* mean = nullptr);
 
 		// Min
 
@@ -387,11 +447,17 @@ namespace alge
 
 		inline float min_all();
 
-		inline void argmin_all(size_t* row, size_t* col);
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', float, vector<float>>::type min();
+
+		inline void argmin_all(size_t*, size_t*);
 
 		inline vector<uint64_t> argmin_rowwise();
 
 		inline vector<uint64_t> argmin_colwise();
+
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', float, vector<float>>::type argmin(size_t* row = nullptr, size_t* col = nullptr);
 
 		// Max
 
@@ -401,11 +467,17 @@ namespace alge
 
 		inline float max_all();
 
-		inline void argmax_all(size_t* row, size_t* col);
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', float, vector<float>>::type max();
+
+		inline void argmax_all(size_t*, size_t*);
 
 		inline vector<uint64_t> argmax_rowwise();
 
 		inline vector<uint64_t> argmax_colwise();
+
+		template<char axis = 'a'>
+		inline std::conditional<axis == 'a', float, vector<float>>::type argmax(size_t* row = nullptr, size_t* col = nullptr);
 
 		// Activation functions
 
@@ -445,7 +517,8 @@ namespace alge
 		inline void self_tanh();
 
 		// Cast
-		template<typename T>
+
+		template <typename T>
 		inline matrix<T> cast();
 
 	private:
@@ -455,7 +528,7 @@ namespace alge
 		size_t actualRows, actualCols;
 		size_t finalPosRows, finalPosCols, finalPosSize;
 		size_t _capacityRows;
+		bool transposed;
 	};
-
 }
 
