@@ -438,7 +438,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_rows != other._rows) throw std::invalid_argument("Error");
-#else
+
 #endif
 			size_t newCols = this->_cols + sizeOther;
 
@@ -542,7 +542,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_cols != other._cols) throw std::invalid_argument("Error");
-#else
+
 #endif
 			size_t newRows = this->_rows + sizeOther;
 
@@ -740,7 +740,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_rows != other._size) throw std::invalid_argument("Error");
-#else
+
 #endif
 			for (size_t j = 0; j < this->_cols; j++)
 			{
@@ -756,7 +756,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_cols != other._size) throw std::invalid_argument("Error");
-#else
+
 #endif
 			for (size_t i = 0; i < this->_rows; i++)
 			{
@@ -778,7 +778,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_rows != other._rows) throw std::invalid_argument("Wrong dimension");
-#else
+
 #endif
 			vector<uint64_t> result(other._cols);
 
@@ -815,7 +815,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_cols != other._cols) throw std::invalid_argument("Wrong dimension");
-#else
+
 #endif
 			vector<uint64_t> result(other._rows);
 
@@ -857,7 +857,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_rows != list.size()) throw std::invalid_argument("Error");
-#else
+
 #endif
 			size_t newCols = this->_cols + 1;
 
@@ -903,7 +903,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_cols != list.size()) throw std::invalid_argument("Error");
-#else
+
 #endif
 			size_t newRows = this->_rows + 1;
 
@@ -970,7 +970,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_rows != vector1._size) throw std::invalid_argument("Error");
-#else
+
 #endif
 			size_t newCols = this->_cols + 1;
 
@@ -1016,7 +1016,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (this->_cols != vector1._size) throw std::invalid_argument("Error");
-#else
+
 #endif
 			size_t newRows = this->_rows + 1;
 
@@ -1084,7 +1084,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if ((this->_rows != matrix1._rows) || (matrix1._cols > 1)) throw std::invalid_argument("Error");
-#else
+
 #endif
 			size_t newCols = this->_cols + 1;
 
@@ -1137,7 +1137,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if ((this->_cols != matrix1._cols) || (matrix1._rows > 1)) throw std::invalid_argument("Error");
-#else
+
 #endif
 			size_t newRows = this->_rows + 1;
 
@@ -1347,7 +1347,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (other.dataToDelete == nullptr) throw std::invalid_argument("Error");
-#else
+
 #endif
 			this->_data = other._data;
 			this->dataToDelete = this->_data;
@@ -1363,7 +1363,7 @@ namespace alge
 		{
 #ifdef _DEBUG
 			if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 			size_t rows = this->_rows;
 			size_t cols = this->_cols;
@@ -1443,7 +1443,7 @@ namespace alge
 			std::cerr << "You can not transfer data from a matrix that does not own its data" << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		delete[] this->dataToDelete;
 
@@ -2008,7 +2008,7 @@ namespace alge
 			std::cerr << "Rows: " << other._rows << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -2250,7 +2250,7 @@ namespace alge
 			std::cerr << "Rows: " << other._rows << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -2663,7 +2663,7 @@ namespace alge
 			std::cerr << "The number of columns must match the number of elements in the vector " << this->_cols << " != " << other._size << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		size_t rows = this->_rows;
 		size_t cols = this->_cols;
@@ -2784,7 +2784,7 @@ namespace alge
 			std::cerr << "The number of columns must match the number of elements in the vector " << this->_cols << " != " << other._size << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		size_t rows = this->_rows;
 		size_t cols = this->_cols;
@@ -2855,7 +2855,7 @@ namespace alge
 			std::cerr << "Rows: " << other._rows << std::endl;
 			exit(1);
 	}
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -3097,7 +3097,7 @@ namespace alge
 			std::cerr << "Rows: " << other._rows << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -3510,7 +3510,7 @@ namespace alge
 			std::cerr << "The number of columns must match the number of elements in the vector " << this->_cols << " != " << other._size << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		size_t rows = this->_rows;
 		size_t cols = this->_cols;
@@ -3631,7 +3631,7 @@ namespace alge
 			std::cerr << "The number of columns must match the number of elements in the vector " << this->_cols << " != " << other._size << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		size_t rows = this->_rows;
 		size_t cols = this->_cols;
@@ -3702,7 +3702,7 @@ namespace alge
 			std::cerr << "Rows: " << other._rows << std::endl;
 			exit(1);
 	}
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -3944,7 +3944,7 @@ namespace alge
 			std::cerr << "Rows: " << other._rows << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -4357,7 +4357,7 @@ namespace alge
 			std::cerr << "The number of columns must match the number of elements in the vector " << this->_cols << " != " << other._size << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		size_t rows = this->_rows;
 		size_t cols = this->_cols;
@@ -4478,7 +4478,7 @@ namespace alge
 			std::cerr << "The number of columns must match the number of elements in the vector " << this->_cols << " != " << other._size << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		size_t rows = this->_rows;
 		size_t cols = this->_cols;
@@ -4549,7 +4549,7 @@ namespace alge
 			std::cerr << "Rows: " << other._rows << std::endl;
 			exit(1);
 	}
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -4791,7 +4791,7 @@ namespace alge
 			std::cerr << "Rows: " << other._rows << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -5204,7 +5204,7 @@ namespace alge
 			std::cerr << "The number of columns must match the number of elements in the vector " << this->_cols << " != " << other._size << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		size_t rows = this->_rows;
 		size_t cols = this->_cols;
@@ -5325,7 +5325,7 @@ namespace alge
 			std::cerr << "The number of columns must match the number of elements in the vector " << this->_cols << " != " << other._size << std::endl;
 			exit(1);
 		}
-#else
+
 #endif
 		size_t rows = this->_rows;
 		size_t cols = this->_cols;
@@ -5385,7 +5385,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -5877,7 +5877,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -6369,7 +6369,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols > this->_cols || other._rows > this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -6861,7 +6861,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols < this->_cols || other._rows < this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -7353,7 +7353,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols >= this->_cols || other._rows >= this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -7845,7 +7845,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols <= this->_cols || other._rows <= this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -12447,7 +12447,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -13030,7 +13030,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -13523,7 +13523,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -14110,7 +14110,7 @@ namespace alge
 	{
 #ifdef _DEBUG
 		if (other._cols != this->_cols || other._rows != this->_rows) throw std::invalid_argument("The dimensions of both matrices must be the same");
-#else
+
 #endif
 
 		size_t rows = this->_rows;
@@ -14602,7 +14602,7 @@ namespace alge
 
 	template <bool thisTransposed, bool thisContiguous>
 	template<char axis>
-	inline std::conditional<axis == 'a', double, vector<double>> matrix<double, thisTransposed, thisContiguous>::mean()
+	inline std::conditional<axis == 'a', double, vector<double>>::type matrix<double, thisTransposed, thisContiguous>::mean()
 	{
 		if constexpr (axis != 'a' && axis != 'r' && axis != 'c')
 		{
@@ -14853,7 +14853,7 @@ namespace alge
 
 	template <bool thisTransposed, bool thisContiguous>
 	template<char axis>
-	inline std::conditional<axis == 'a', double, vector<double>> matrix<double, thisTransposed, thisContiguous>::sum()
+	inline std::conditional<axis == 'a', double, vector<double>>::type matrix<double, thisTransposed, thisContiguous>::sum()
 	{
 		if constexpr (axis != 'a' && axis != 'r' && axis != 'c')
 		{
@@ -15191,7 +15191,7 @@ namespace alge
 
 	template <bool thisTransposed, bool thisContiguous>
 	template<char axis>
-	inline std::conditional<axis == 'a', double, vector<double>> matrix<double, thisTransposed, thisContiguous>::std(double ddof, double* mean)
+	inline std::conditional<axis == 'a', double, vector<double>>::type matrix<double, thisTransposed, thisContiguous>::std(double ddof, double* mean)
 	{
 		if constexpr (axis != 'a' && axis != 'r' && axis != 'c')
 		{
@@ -15456,7 +15456,7 @@ namespace alge
 
 	template <bool thisTransposed, bool thisContiguous>
 	template<char axis>
-	inline std::conditional<axis == 'a', double, vector<double>> matrix<double, thisTransposed, thisContiguous>::min()
+	inline std::conditional<axis == 'a', double, vector<double>>::type matrix<double, thisTransposed, thisContiguous>::min()
 	{
 		if constexpr (axis != 'a' && axis != 'r' && axis != 'c')
 		{
@@ -15855,7 +15855,7 @@ namespace alge
 
 	template <bool thisTransposed, bool thisContiguous>
 	template<char axis>
-	inline std::conditional<axis == 'a', double, vector<double>> matrix<double, thisTransposed, thisContiguous>::argmin(size_t* row, size_t* col)
+	inline std::conditional<axis == 'a', double, vector<double>>::type matrix<double, thisTransposed, thisContiguous>::argmin(size_t* row, size_t* col)
 	{
 		if constexpr (axis != 'a' && axis != 'r' && axis != 'c')
 		{
@@ -16119,8 +16119,8 @@ namespace alge
 	}
 
 	template <bool thisTransposed, bool thisContiguous>
-	template<char axis>
-	inline std::conditional<axis == 'a', double, vector<double>> matrix<double, thisTransposed, thisContiguous>::max()
+	template <char axis>
+	inline std::conditional<axis == 'a', double, vector<double>>::type matrix<double, thisTransposed, thisContiguous>::max()
 	{
 		if constexpr (axis != 'a' && axis != 'r' && axis != 'c')
 		{
@@ -16519,7 +16519,7 @@ namespace alge
 
 	template <bool thisTransposed, bool thisContiguous>
 	template<char axis>
-	inline std::conditional<axis == 'a', double, vector<double>> matrix<double, thisTransposed, thisContiguous>::argmax(size_t* row, size_t* col)
+	inline std::conditional<axis == 'a', double, vector<double>>::type matrix<double, thisTransposed, thisContiguous>::argmax(size_t* row, size_t* col)
 	{
 		if constexpr (axis != 'a' && axis != 'r' && axis != 'c')
 		{
@@ -16870,24 +16870,7 @@ namespace alge
 			{
 				for (size_t i = 0; i < rows; i++)
 				{
-					for (size_t j = 0; j < finalPosCols; j += 4)
-					{
-						__m256d a = _mm256_load_pd(&data1[i * matrix1ActualCols + j]);
-
-						__m256d lrelu = _mm256_blendv_pd(_mm256_mul_pd(a, _num), a, _mm256_cmp_pd(a, _zero, _CMP_GT_OQ));
-
-						__m128d val1 = _mm256_extractf128_pd(lrelu, 1);
-						__m128d val2 = _mm256_castpd256_pd128(lrelu);
-
-						_mm_store_sd(&dataResult[j * rows + i], val2);
-						val2 = _mm_shuffle_pd(val2, val2, 1);
-						_mm_store_sd(&dataResult[(j + 1) * rows + i], val2);
-
-						_mm_store_sd(&dataResult[(j + 2) * rows + i], val1);
-						val1 = _mm_shuffle_pd(val1, val1, 1);
-						_mm_store_sd(&dataResult[(j + 3) * rows + i], val1);
-					}
-					for (size_t j = finalPosCols; j < cols; j++)
+					for (size_t j = 0; j < cols; j++)
 					{
 						dataResult[j * rows + i] = data1[i * matrix1ActualCols + j] > 0.0 ? data1[i * matrix1ActualCols + j] : data1[i * matrix1ActualCols + j] * 0.01;
 					}
@@ -16905,24 +16888,7 @@ namespace alge
 			{
 				for (size_t j = 0; j < cols; j++)
 				{
-					for (size_t i = 0; i < finalPosRows; i += 4)
-					{
-						__m256d a = _mm256_load_pd(&data1[j * matrix1ActualRows + i]);
-
-						__m256d lrelu = _mm256_blendv_pd(_mm256_mul_pd(a, _num), a, _mm256_cmp_pd(a, _zero, _CMP_GT_OQ));
-
-						__m128d val1 = _mm256_extractf128_pd(lrelu, 1);
-						__m128d val2 = _mm256_castpd256_pd128(lrelu);
-
-						_mm_store_sd(&dataResult[i * cols + j], val2);
-						val2 = _mm_shuffle_pd(val2, val2, 1);
-						_mm_store_sd(&dataResult[(i + 1) * cols + j], val2);
-
-						_mm_store_sd(&dataResult[(i + 2) * cols + j], val1);
-						val1 = _mm_shuffle_pd(val1, val1, 1);
-						_mm_store_sd(&dataResult[(i + 3) * cols + j], val1);
-					}
-					for (size_t i = finalPosRows; i < rows; i++)
+					for (size_t i = 0; i < rows; i++)
 					{
 						dataResult[i * cols + j] = data1[j * matrix1ActualRows + i] > 0.0 ? data1[j * matrix1ActualRows + i] : data1[j * matrix1ActualRows + i] * 0.01;
 					}
