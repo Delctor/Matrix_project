@@ -13,7 +13,8 @@ namespace alge
 			size_t
 				start,
 				end,
-				step;
+				step, 
+				space;
 			void* extraParameters;
 		};
 
@@ -30,8 +31,9 @@ namespace alge
 		// start, end, step
 		typedef void (*loopFunctionType)(loopParameters*);
 
-		void parallelFor(loopFunctionType loopFunction, size_t start, size_t end, size_t step, void* extraParameters = nullptr)
+		inline void parallelFor(loopFunctionType loopFunction, size_t start, size_t end, size_t step, void* extraParameters = nullptr)
 		{
+			
 			size_t space = (end - start);
 			size_t actualSteps = space / threadsInfo.nThreads;
 			int64_t remainder = space % threadsInfo.nThreads;
@@ -48,10 +50,17 @@ namespace alge
 
 				threadsInfo.parameters[i].end = lastEnd;
 				threadsInfo.parameters[i].step = step;
+				threadsInfo.parameters[i].space = threadsInfo.parameters[i].end - threadsInfo.parameters[i].start;
 				threadsInfo.parameters[i].extraParameters = extraParameters;
+				/*
+				std::cout << "Thread " << i << ":" << std::endl;
+				std::cout << "Start: " << threadsInfo.parameters[i].start << std::endl;
+				std::cout << "End: " << threadsInfo.parameters[i].end << std::endl;
+				std::cout << "Step: " << threadsInfo.parameters[i].step << std::endl;*/
 
 				threadsInfo.threads[i] = CreateThread(NULL, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(loopFunction), &threadsInfo.parameters[i], 0, NULL);
 			}
+			//std::cin.get();
 			WaitForMultipleObjects(threadsInfo.nThreads, threadsInfo.threads, true, INFINITE);
 
 			for (size_t j = 0; j < i; j++)
