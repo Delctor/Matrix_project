@@ -5,6 +5,13 @@
 #include <vectorInt.h>
 #include <vectorUint8_t.h>
 
+#ifdef max
+#undef max
+#endif
+#ifdef min
+#undef min
+#endif
+
 namespace alge
 {
 	template <>
@@ -61,6 +68,12 @@ namespace alge
 
 		friend inline vector<uint8_t> operator<=(double, vector<double>&);
 
+		template<bool useSteps, bool thisContiguous>
+		friend inline matrix<double> randomGenerator(matrix<double, false, thisContiguous>&, size_t);
+
+		template<bool matrix1Contiguous, bool matrix2Contiguous>
+		friend inline vector<double> kernelDensity(matrix<double, false, matrix1Contiguous>&, matrix<double, false, matrix2Contiguous>&, double);
+
 		template<typename T>
 		friend inline size_t upper_bound(vector<T>&, size_t, size_t, T);
 
@@ -71,6 +84,18 @@ namespace alge
 
 		template<typename T>
 		friend inline vector<T> concatenate(vector<T>&, vector<T>&);
+
+		template<typename T>
+		friend inline vector<T> concatenate(vector<T>**, size_t, size_t);
+
+		template<typename T>
+		friend inline vector<T> concatenate(vector<T>**, size_t);
+
+		template<typename T>
+		friend inline void vectorize(vector<T>&, T(T));
+
+		template<typename T, typename T2>
+		friend inline void vectorize(vector<T>&, T2(T2));
 
 		// Block
 
@@ -134,49 +159,58 @@ namespace alge
 
 		// +
 
+		template<bool parallel = false>
 		inline vector<double> operator+(vector<double>& other);
 
+		template<bool parallel = false>
 		inline vector<double> operator+(double num);
 
-
+		template<bool parallel = false>
 		inline void operator+=(vector<double>& other);
 
+		template<bool parallel = false>
 		inline void operator+=(double num);
 
 		// -
 
-
+		template<bool parallel = false>
 		inline vector<double> operator-(vector<double>& other);
 
+		template<bool parallel = false>
 		inline vector<double> operator-(double num);
 
-
+		template<bool parallel = false>
 		inline void operator-=(vector<double>& other);
 
+		template<bool parallel = false>
 		inline void operator-=(double num);
 
 		// *
 
-
+		template<bool parallel = false>
 		inline vector<double> operator*(vector<double>& other);
 
+		template<bool parallel = false>
 		inline vector<double> operator*(double num);
 
-
+		template<bool parallel = false>
 		inline void operator*=(vector<double>& other);
 
+		template<bool parallel = false>
 		inline void operator*=(double num);
 
 		// /
 
-
+		template<bool parallel = false>
 		inline vector<double> operator/(vector<double>& other);
 
+		template<bool parallel = false>
 		inline vector<double> operator/(double num);
 
-
+		template<bool parallel = false>
 		inline void operator/=(vector<double>& other);
 
+		template<bool parallel = false>
 		inline void operator/=(double num);
 
 		// ==
